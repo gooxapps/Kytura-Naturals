@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /wholesale/portal
+Disallow: /api/
+
+Sitemap: https://kyturanaturals.vercel.app/sitemap.xml

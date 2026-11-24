@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@theme {
+  --color-kytura-purple: #5000AF;
+  --color-kytura-violet: #39008B;
+  --color-kytura-lavender: #AA87FF;
+  --color-kytura-deep: #0E021E;
+  --color-kytura-leaf: #8ACE69;
+  --color-kytura-grass: #538710;
+  --color-kytura-pink: #FF8CC7;
+  --color-kytura-magenta: #B71C85;
+  --color-kytura-ice: #F3F0FF;
+
+  --font-display: "Playfair Display", "Cormorant Garamond", Georgia, serif;
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    color: #0E021E;
+    background-color: #FFFFFF;
+    scroll-behavior: smooth;
+  }
+
+  h1, h2, h3, .font-display {
+    font-family: var(--font-display);
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

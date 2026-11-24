@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://kyturanaturals.vercel.app/</loc><priority>1.0</priority></url>
+  <url><loc>https://kyturanaturals.vercel.app/shop</loc><priority>0.9</priority></url>
+  <url><loc>https://kyturanaturals.vercel.app/collections/diffuser-oil-blends</loc><priority>0.8</priority></url>
+  <url><loc>https://kyturanaturals.vercel.app/collections/body-massage-oils</loc><priority>0.8</priority></url>
+  <url><loc>https://kyturanaturals.vercel.app/collections/ultrasonic-diffusers</loc><priority>0.8</priority></url>
+  <url><loc>https://kyturanaturals.vercel.app/collections/wellness-collections</loc><priority>0.8</priority></url>
+  <url><loc>https://kyturanaturals.vercel.app/about</loc><priority>0.7</priority></url>
+  <url><loc>https://kyturanaturals.vercel.app/wholesale</loc><priority>0.8</priority></url>
+  <url><loc>https://kyturanaturals.vercel.app/contact</loc><priority>0.7</priority></url>
+  <url><loc>https://kyturanaturals.vercel.app/faq</loc><priority>0.6</priority></url>
+  <url><loc>https://kyturanaturals.vercel.app/privacy-policy</loc><priority>0.4</priority></url>
+  <url><loc>https://kyturanaturals.vercel.app/terms-and-conditions</loc><priority>0.4</priority></url>
+  <url><loc>https://kyturanaturals.vercel.app/shipping-returns</loc><priority>0.5</priority></url>
+</urlset>

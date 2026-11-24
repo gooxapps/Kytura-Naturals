@@ -1,0 +1,8 @@
+{
+  "name": "KyturaNaturals",
+  "description": "Botanical wellness store offering organic diffuser oil blends, body and massage oils, and ultrasonic diffusers in CAD, with WhatsApp retail checkout, wholesale portal, and admin dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

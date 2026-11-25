@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Eye, ShoppingBag, Sparkles, X } from 'lucide-react';
 import type { Product } from '../types';
@@ -14,6 +14,10 @@ export const ResilientImage: React.FC<{
   className?: string;
 }> = ({ src, alt, className = '' }) => {
   const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
 
   if (!src || failed) {
     return (

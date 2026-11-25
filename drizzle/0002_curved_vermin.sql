@@ -1,0 +1,1 @@
+ALTER TABLE "media_library" ADD COLUMN "file_data" text DEFAULT '' NOT NULL;

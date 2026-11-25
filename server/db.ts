@@ -296,6 +296,7 @@ export function initDatabase(): void {
       mime_type TEXT NOT NULL,
       file_size_bytes INTEGER NOT NULL DEFAULT 0,
       alt_text TEXT NOT NULL DEFAULT '',
+      file_data TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -343,6 +344,13 @@ export function initDatabase(): void {
     if (!existingCols.has(col)) {
       db.exec(`ALTER TABLE site_settings ADD COLUMN ${col} ${def};`);
     }
+  }
+
+  const existingMediaCols = new Set(
+    (db.prepare('PRAGMA table_info(media_library)').all() as Array<{ name: string }>).map((c) => c.name)
+  );
+  if (!existingMediaCols.has('file_data')) {
+    db.exec("ALTER TABLE media_library ADD COLUMN file_data TEXT NOT NULL DEFAULT '';");
   }
 
   seedInitialData(db);

@@ -267,8 +267,10 @@ const PG_DDL_STATEMENTS = [
     mime_type TEXT NOT NULL,
     file_size_bytes INTEGER NOT NULL DEFAULT 0,
     alt_text TEXT NOT NULL DEFAULT '',
+    file_data TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );`,
+  `ALTER TABLE media_library ADD COLUMN IF NOT EXISTS file_data TEXT NOT NULL DEFAULT '';`,
   `CREATE TABLE IF NOT EXISTS activity_logs (
     id TEXT PRIMARY KEY,
     actor_email TEXT NOT NULL DEFAULT 'system',

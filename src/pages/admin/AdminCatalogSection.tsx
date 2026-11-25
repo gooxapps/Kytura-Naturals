@@ -26,31 +26,53 @@ export const AdminCatalogSection: React.FC<AdminCatalogSectionProps> = ({
   const [editingCategory, setEditingCategory] = useState<Partial<Category> | null>(null);
   const [saving, setSaving] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
+  const [modalError, setModalError] = useState('');
 
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
+    setModalError('');
+    const price = Number(editingProduct.retail_price_cad);
+    if (!Number.isFinite(price) || price < 0) {
+      setModalError('Please enter a valid retail price (0 or greater).');
+      return;
+    }
+
     setSaving(true);
     setStatusMsg('');
     try {
       const isNew = !editingProduct.id;
       const url = isNew ? '/api/admin/products' : `/api/admin/products/${editingProduct.id}`;
+      const payload = {
+        ...editingProduct,
+        retail_price_cad: price,
+        is_published: editingProduct.is_published ?? true,
+      };
       const res = await fetch(url, {
         method: isNew ? 'POST' : 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(editingProduct),
+        body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      const raw = await res.text();
+      let data: { error?: string } = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        data = {};
+      }
       if (!res.ok) {
-        setStatusMsg(data.error || 'Failed to save product.');
+        setModalError(data.error || `Failed to save product (HTTP ${res.status}).`);
       } else {
         setEditingProduct(null);
+        setModalError('');
         await onRefresh();
         setStatusMsg('Product saved.');
       }
+    } catch {
+      setModalError('Network error while saving product.');
     } finally {
       setSaving(false);
     }
@@ -72,6 +94,7 @@ export const AdminCatalogSection: React.FC<AdminCatalogSectionProps> = ({
     if (!editingCategory) return;
     setSaving(true);
     setStatusMsg('');
+    setModalError('');
     try {
       const isNew = !editingCategory.id;
       const url = isNew
@@ -85,14 +108,23 @@ export const AdminCatalogSection: React.FC<AdminCatalogSectionProps> = ({
         },
         body: JSON.stringify(editingCategory),
       });
-      const data = await res.json();
+      const raw = await res.text();
+      let data: { error?: string } = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        data = {};
+      }
       if (!res.ok) {
-        setStatusMsg(data.error || 'Failed to save category.');
+        setModalError(data.error || `Failed to save category (HTTP ${res.status}).`);
       } else {
         setEditingCategory(null);
+        setModalError('');
         await onRefresh();
         setStatusMsg('Category saved.');
       }
+    } catch {
+      setModalError('Network error while saving category.');
     } finally {
       setSaving(false);
     }
@@ -121,15 +153,16 @@ export const AdminCatalogSection: React.FC<AdminCatalogSectionProps> = ({
           </div>
           <button
             type="button"
-            onClick={() =>
+            onClick={() => {
+              setModalError('');
               setEditingCategory({
                 name: '',
                 description: '',
                 image_url: '',
                 display_order: categories.length + 1,
                 is_visible: true,
-              })
-            }
+              });
+            }}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#5000AF] text-white text-xs font-semibold hover:bg-[#39008B]"
           >
             <Plus className="w-4 h-4" />
@@ -167,7 +200,10 @@ export const AdminCatalogSection: React.FC<AdminCatalogSectionProps> = ({
               <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  onClick={() => setEditingCategory(cat)}
+                  onClick={() => {
+                    setModalError('');
+                    setEditingCategory(cat);
+                  }}
                   className="p-2 rounded-lg hover:bg-[#F3F0FF] text-[#39008B]"
                   aria-label={`Edit ${cat.name}`}
                 >
@@ -196,10 +232,22 @@ export const AdminCatalogSection: React.FC<AdminCatalogSectionProps> = ({
                 <h3 className="font-display text-xl font-bold">
                   {editingCategory.id ? 'Edit Category' : 'New Category'}
                 </h3>
-                <button type="button" onClick={() => setEditingCategory(null)}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalError('');
+                    setEditingCategory(null);
+                  }}
+                >
                   <X className="w-5 h-5" />
                 </button>
               </div>
+
+              {modalError && (
+                <div className="p-3 rounded-xl bg-[#B71C85]/10 border border-[#B71C85]/30 text-xs font-semibold text-[#B71C85]">
+                  {modalError}
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold mb-1">Name *</label>
@@ -298,7 +346,8 @@ export const AdminCatalogSection: React.FC<AdminCatalogSectionProps> = ({
         </div>
         <button
           type="button"
-          onClick={() =>
+          onClick={() => {
+            setModalError('');
             setEditingProduct({
               name: '',
               sku: '',
@@ -312,8 +361,8 @@ export const AdminCatalogSection: React.FC<AdminCatalogSectionProps> = ({
               category_ids: categories[0] ? [categories[0].id] : [],
               image_url: '',
               variants: [],
-            })
-          }
+            });
+          }}
           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#5000AF] text-white text-xs font-semibold hover:bg-[#39008B]"
         >
           <Plus className="w-4 h-4" />
@@ -380,12 +429,13 @@ export const AdminCatalogSection: React.FC<AdminCatalogSectionProps> = ({
                 <td className="px-4 py-3 text-right whitespace-nowrap">
                   <button
                     type="button"
-                    onClick={() =>
+                    onClick={() => {
+                      setModalError('');
                       setEditingProduct({
                         ...p,
                         image_url: p.images[0]?.image_url || '',
-                      })
-                    }
+                      });
+                    }}
                     className="p-1.5 rounded-lg hover:bg-[#F3F0FF] text-[#39008B]"
                     aria-label={`Edit ${p.name}`}
                   >
@@ -417,10 +467,22 @@ export const AdminCatalogSection: React.FC<AdminCatalogSectionProps> = ({
               <h3 className="font-display text-xl font-bold">
                 {editingProduct.id ? 'Edit Product' : 'Create Product'}
               </h3>
-              <button type="button" onClick={() => setEditingProduct(null)}>
+              <button
+                type="button"
+                onClick={() => {
+                  setModalError('');
+                  setEditingProduct(null);
+                }}
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {modalError && (
+              <div className="p-3 rounded-xl bg-[#B71C85]/10 border border-[#B71C85]/30 text-xs font-semibold text-[#B71C85]">
+                {modalError}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>

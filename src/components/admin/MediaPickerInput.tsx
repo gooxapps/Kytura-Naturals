@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image as ImageIcon, Search, Upload, X } from 'lucide-react';
 import type { MediaAsset } from '../../types';
 
@@ -17,6 +17,70 @@ interface MediaPickerInputProps {
   hint?: string;
 }
 
+const RESIZE_THRESHOLD_BYTES = 2.5 * 1024 * 1024;
+const MAX_DIMENSION_PX = 2048;
+
+async function prepareImageForUpload(file: File): Promise<File> {
+  const mime = (file.type || '').toLowerCase();
+  const resizableTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/bmp'];
+  if (file.size <= RESIZE_THRESHOLD_BYTES || !resizableTypes.includes(mime)) {
+    return file;
+  }
+
+  return new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        let { width, height } = img;
+        if (!width || !height) {
+          URL.revokeObjectURL(objectUrl);
+          resolve(file);
+          return;
+        }
+        const scale = Math.min(1, MAX_DIMENSION_PX / Math.max(width, height));
+        width = Math.max(1, Math.round(width * scale));
+        height = Math.max(1, Math.round(height * scale));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          URL.revokeObjectURL(objectUrl);
+          resolve(file);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const targetMime = mime === 'image/png' ? 'image/webp' : mime === 'image/webp' ? 'image/webp' : 'image/jpeg';
+        const targetExt = targetMime === 'image/webp' ? '.webp' : '.jpg';
+        canvas.toBlob(
+          (blob) => {
+            URL.revokeObjectURL(objectUrl);
+            if (!blob || blob.size >= file.size) {
+              resolve(file);
+              return;
+            }
+            const baseName = file.name.replace(/\.[^.]+$/, '') || 'image';
+            resolve(new File([blob], `${baseName}${targetExt}`, { type: targetMime }));
+          },
+          targetMime,
+          0.86
+        );
+      } catch {
+        URL.revokeObjectURL(objectUrl);
+        resolve(file);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(file);
+    };
+    img.src = objectUrl;
+  });
+}
+
 export const MediaPickerInput: React.FC<MediaPickerInputProps> = ({
   label,
   value,
@@ -25,7 +89,7 @@ export const MediaPickerInput: React.FC<MediaPickerInputProps> = ({
   media,
   onMediaUploaded,
   bucket = 'site-branding',
-  accept = 'image/jpeg,image/png,image/webp,image/avif,.ico',
+  accept = 'image/*,.ico,.svg,.heic,.heif',
   placeholder = 'https://... or /assets/...',
   previewDark = false,
   previewContain = true,
@@ -33,25 +97,38 @@ export const MediaPickerInput: React.FC<MediaPickerInputProps> = ({
 }) => {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [previewError, setPreviewError] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    setPreviewError(false);
+  }, [value]);
 
   const handleFileChange = async (file: File) => {
     setUploading(true);
     setUploadError('');
     try {
+      const preparedFile = await prepareImageForUpload(file);
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', preparedFile);
       fd.append('bucket', bucket);
       const res = await fetch('/api/admin/media', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: fd,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setUploadError(data.error || 'Image upload failed.');
+      const raw = await res.text();
+      let data: { error?: string; asset?: MediaAsset } = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        data = {};
+      }
+      if (!res.ok || !data.asset?.file_url) {
+        setUploadError(data.error || `Image upload failed (HTTP ${res.status}).`);
       } else {
+        setPreviewError(false);
         onChange(data.asset.file_url);
         if (onMediaUploaded) {
           await onMediaUploaded();
@@ -96,11 +173,16 @@ export const MediaPickerInput: React.FC<MediaPickerInputProps> = ({
               previewDark ? 'bg-[#1D0047]' : 'bg-[#F3F0FF]/70'
             }`}
           >
-            <img
-              src={value}
-              alt={label}
-              className={`w-full h-full ${previewContain ? 'object-contain' : 'object-cover'}`}
-            />
+            {previewError ? (
+              <ImageIcon className="w-4 h-4 text-[#B71C85]" />
+            ) : (
+              <img
+                src={value}
+                alt={label}
+                onError={() => setPreviewError(true)}
+                className={`w-full h-full ${previewContain ? 'object-contain' : 'object-cover'}`}
+              />
+            )}
           </div>
         )}
 
@@ -138,6 +220,11 @@ export const MediaPickerInput: React.FC<MediaPickerInputProps> = ({
       </div>
 
       {hint && <p className="text-[11px] text-[#0E021E]/55">{hint}</p>}
+      {previewError && value && (
+        <p className="text-[11px] font-medium text-[#B71C85]">
+          Preview could not load from this URL. Try uploading the image file directly.
+        </p>
+      )}
       {uploadError && <p className="text-[11px] font-semibold text-[#B71C85]">{uploadError}</p>}
 
       {pickerOpen && (

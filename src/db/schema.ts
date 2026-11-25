@@ -342,6 +342,7 @@ export const mediaLibrary = pgTable('media_library', {
   mime_type: text('mime_type').notNull(),
   file_size_bytes: integer('file_size_bytes').notNull().default(0),
   alt_text: text('alt_text').notNull().default(''),
+  file_data: text('file_data').notNull().default(''),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

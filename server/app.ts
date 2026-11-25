@@ -1,11 +1,18 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import path from 'node:path';
 import multer from 'multer';
 import dotenv from 'dotenv';
 import { getStore } from './dataAdapter.ts';
 import { hashPassword, verifyPassword, uid } from './crypto.ts';
-import { isValidImageUpload, storeMediaFile, removeMediaFile, UPLOADS_DIR } from './storage.ts';
+import {
+  isValidImageUpload,
+  MAX_IMAGE_UPLOAD_BYTES,
+  storeMediaFile,
+  removeMediaFile,
+  UPLOADS_DIR,
+} from './storage.ts';
 import { isNeonConfigured } from './neonDb.ts';
 
 dotenv.config();
@@ -180,12 +187,55 @@ if (fs.existsSync(UPLOADS_DIR)) {
   app.use('/uploads', express.static(UPLOADS_DIR));
 }
 
-// Configure Multer with memory storage (Vercel Blob compatible + 5 MB limit)
+// Serve database-backed uploaded media assets cleanly in all environments (preview, Neon, Vercel)
+app.get(
+  '/api/media/:id',
+  asyncHandler(async (req, res) => {
+    const id = getParam(req.params.id);
+    const store = await getStore();
+    const asset = await store.getMediaContentById(id);
+    if (!asset) {
+      res.status(404).send('Image not found');
+      return;
+    }
+
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+
+    if (asset.file_data) {
+      const buf = Buffer.from(asset.file_data, 'base64');
+      const contentType = asset.mime_type || 'application/octet-stream';
+      res.setHeader('Content-Type', contentType);
+      if (contentType.includes('svg')) {
+        res.setHeader('Content-Security-Policy', 'sandbox');
+      }
+      res.send(buf);
+      return;
+    }
+
+    if (asset.file_url && asset.file_url.startsWith('/uploads/')) {
+      const filePath = path.resolve(UPLOADS_DIR, path.basename(asset.file_url));
+      if (filePath.startsWith(UPLOADS_DIR + path.sep) && fs.existsSync(filePath)) {
+        res.sendFile(filePath);
+        return;
+      }
+    }
+
+    if (asset.file_url && /^https?:\/\//i.test(asset.file_url)) {
+      res.redirect(asset.file_url);
+      return;
+    }
+
+    res.status(404).send('Image content unavailable');
+  })
+);
+
+// Configure Multer with memory storage (Database + Vercel Blob compatible, 15 MB limit)
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: MAX_IMAGE_UPLOAD_BYTES },
   fileFilter: (_req, file, cb) => {
-    const check = isValidImageUpload(file.mimetype, 1024);
+    const check = isValidImageUpload(file.mimetype, 1024, file.originalname);
     if (!check.ok) {
       cb(new Error(check.error || 'Unsupported file type.'));
       return;
@@ -832,24 +882,33 @@ app.post(
     const slug = slugTaken ? `${baseSlug}-${crypto.randomInt(100, 999)}` : baseSlug;
     const finalSku = String(sku || `KN-${crypto.randomInt(10000, 99999)}`).trim();
 
-    await store.createProduct({
-      id,
-      slug,
-      name: String(name).trim(),
-      sku: finalSku,
-      short_description: String(short_description).trim(),
-      description: String(description).trim(),
-      retail_price_cad: Number(retail_price_cad),
-      compare_at_price_cad,
-      stock_quantity,
-      is_published,
-      is_featured,
-      seo_title: String(seo_title || `${name} | Kytura Naturals`).trim(),
-      seo_description: String(seo_description || short_description).trim(),
-      category_ids,
-      image_url,
-      variants,
-    });
+    try {
+      await store.createProduct({
+        id,
+        slug,
+        name: String(name).trim(),
+        sku: finalSku,
+        short_description: String(short_description).trim(),
+        description: String(description).trim(),
+        retail_price_cad: Number(retail_price_cad),
+        compare_at_price_cad,
+        stock_quantity,
+        is_published,
+        is_featured,
+        seo_title: String(seo_title || `${name} | Kytura Naturals`).trim(),
+        seo_description: String(seo_description || short_description).trim(),
+        category_ids,
+        image_url,
+        variants,
+      });
+    } catch (prodErr: unknown) {
+      const msg = prodErr instanceof Error ? prodErr.message : '';
+      if (/unique|duplicate/i.test(msg)) {
+        res.status(400).json({ error: 'A product with that SKU or slug already exists. Please use a unique SKU.' });
+        return;
+      }
+      throw prodErr;
+    }
 
     await store.logActivity(req.user!.email, 'Created product', 'product', id, { name, retail_price_cad });
     res.status(201).json({ id, slug });
@@ -874,27 +933,37 @@ app.put(
       seo_title = '',
       seo_description = '',
       category_ids = [],
-      image_url = '',
+      image_url,
       variants = [],
     } = req.body ?? {};
 
     const store = await getStore();
-    const updated = await store.updateProduct(id, {
-      name,
-      sku,
-      short_description,
-      description,
-      retail_price_cad,
-      compare_at_price_cad,
-      stock_quantity,
-      is_published,
-      is_featured,
-      seo_title,
-      seo_description,
-      category_ids,
-      image_url,
-      variants,
-    });
+    let updated = false;
+    try {
+      updated = await store.updateProduct(id, {
+        name,
+        sku,
+        short_description,
+        description,
+        retail_price_cad,
+        compare_at_price_cad,
+        stock_quantity,
+        is_published,
+        is_featured,
+        seo_title,
+        seo_description,
+        category_ids,
+        image_url,
+        variants,
+      });
+    } catch (prodErr: unknown) {
+      const msg = prodErr instanceof Error ? prodErr.message : '';
+      if (/unique|duplicate/i.test(msg)) {
+        res.status(400).json({ error: 'Another product already uses that SKU. Please enter a unique SKU.' });
+        return;
+      }
+      throw prodErr;
+    }
 
     if (!updated) {
       res.status(404).json({ error: 'Product not found.' });
@@ -1189,38 +1258,45 @@ app.post('/api/admin/media', requireAdmin(), (req: AuthenticatedRequest, res) =>
   upload.single('file')(req, res, async (err) => {
     try {
       if (err) {
-        res.status(400).json({ error: err.message || 'Upload failed.' });
+        const msg =
+          err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE'
+            ? 'Image file exceeds the 15 MB limit. Please try a smaller image.'
+            : err.message || 'Upload failed.';
+        res.status(400).json({ error: msg });
         return;
       }
       if (!req.file) {
         res.status(400).json({ error: 'No image file provided.' });
         return;
       }
-      const validation = isValidImageUpload(req.file.mimetype, req.file.size);
+      const validation = isValidImageUpload(req.file.mimetype, req.file.size, req.file.originalname);
       if (!validation.ok) {
         res.status(400).json({ error: validation.error });
         return;
       }
 
+      const id = uid();
+      const resolvedMime = validation.resolvedMime || req.file.mimetype || 'image/jpeg';
       const bucket = String(req.body?.bucket || 'media-library');
       const altText = String(req.body?.alt_text || req.file.originalname);
       const uploaded = await storeMediaFile({
+        id,
         buffer: req.file.buffer,
         originalName: req.file.originalname,
-        mimeType: req.file.mimetype,
+        mimeType: resolvedMime,
         bucket,
       });
 
       const store = await getStore();
-      const id = uid();
       await store.createMedia({
         id,
         file_name: req.file.originalname,
         bucket,
         file_url: uploaded.fileUrl,
-        mime_type: req.file.mimetype,
+        mime_type: resolvedMime,
         file_size_bytes: req.file.size,
         alt_text: altText,
+        file_data: uploaded.fileData,
       });
 
       await store.logActivity(req.user!.email, 'Uploaded media asset', 'media', id, {
@@ -1235,9 +1311,10 @@ app.post('/api/admin/media', requireAdmin(), (req: AuthenticatedRequest, res) =>
           file_name: req.file.originalname,
           bucket,
           file_url: uploaded.fileUrl,
-          mime_type: req.file.mimetype,
+          mime_type: resolvedMime,
           file_size_bytes: req.file.size,
           alt_text: altText,
+          created_at: new Date().toISOString(),
         },
       });
     } catch (uploadErr) {

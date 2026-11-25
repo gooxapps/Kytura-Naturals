@@ -126,6 +126,7 @@ export interface DataStore {
   listMedia(): Promise<Array<Record<string, unknown>>>;
   createMedia(input: Record<string, unknown>): Promise<void>;
   getMediaById(id: string): Promise<{ id: string; file_url: string; file_name: string } | null>;
+  getMediaContentById(id: string): Promise<{ id: string; file_url: string; file_name: string; mime_type: string; file_data: string } | null>;
   deleteMedia(id: string): Promise<void>;
 
   subscribeNewsletter(email: string): Promise<void>;
@@ -539,19 +540,21 @@ class NeonDrizzleStore implements DataStore {
     const [existing] = await this.db.select().from(schema.products).where(eq(schema.products.id, id)).limit(1);
     if (!existing) return false;
 
+    const resolvedSku = String(input.sku || existing.sku || `KN-${crypto.randomInt(10000, 99999)}`).trim();
+
     await this.db
       .update(schema.products)
       .set({
-        name: String(input.name).trim(),
-        sku: String(input.sku).trim(),
+        name: String(input.name || existing.name).trim(),
+        sku: resolvedSku,
         short_description: String(input.short_description || '').trim(),
         description: String(input.description || '').trim(),
-        retail_price_cad: String(Number(input.retail_price_cad).toFixed(2)),
+        retail_price_cad: String(Number(input.retail_price_cad ?? existing.retail_price_cad).toFixed(2)),
         compare_at_price_cad:
           input.compare_at_price_cad !== null && input.compare_at_price_cad !== undefined && input.compare_at_price_cad !== ''
             ? String(Number(input.compare_at_price_cad).toFixed(2))
             : null,
-        stock_quantity: Math.max(0, Math.floor(Number(input.stock_quantity) || 0)),
+        stock_quantity: Math.max(0, Math.floor(Number(input.stock_quantity ?? existing.stock_quantity) || 0)),
         is_published: Boolean(input.is_published ?? true),
         is_featured: Boolean(input.is_featured ?? false),
         seo_title: String(input.seo_title || '').trim(),
@@ -560,16 +563,18 @@ class NeonDrizzleStore implements DataStore {
       })
       .where(eq(schema.products.id, id));
 
-    if (String(input.image_url || '').trim()) {
+    if (input.image_url !== undefined) {
       await this.db.delete(schema.productImages).where(eq(schema.productImages.product_id, id));
-      await this.db.insert(schema.productImages).values({
-        id: uid(),
-        product_id: id,
-        image_url: String(input.image_url).trim(),
-        alt_text: String(input.name).trim(),
-        display_order: 0,
-        is_primary: true,
-      });
+      if (String(input.image_url || '').trim()) {
+        await this.db.insert(schema.productImages).values({
+          id: uid(),
+          product_id: id,
+          image_url: String(input.image_url).trim(),
+          alt_text: String(input.name || existing.name).trim(),
+          display_order: 0,
+          is_primary: true,
+        });
+      }
     }
 
     if (Array.isArray(input.category_ids)) {
@@ -1057,7 +1062,19 @@ class NeonDrizzleStore implements DataStore {
   }
 
   async listMedia(): Promise<Array<Record<string, unknown>>> {
-    return this.db.select().from(schema.mediaLibrary).orderBy(desc(schema.mediaLibrary.created_at));
+    return this.db
+      .select({
+        id: schema.mediaLibrary.id,
+        file_name: schema.mediaLibrary.file_name,
+        bucket: schema.mediaLibrary.bucket,
+        file_url: schema.mediaLibrary.file_url,
+        mime_type: schema.mediaLibrary.mime_type,
+        file_size_bytes: schema.mediaLibrary.file_size_bytes,
+        alt_text: schema.mediaLibrary.alt_text,
+        created_at: schema.mediaLibrary.created_at,
+      })
+      .from(schema.mediaLibrary)
+      .orderBy(desc(schema.mediaLibrary.created_at));
   }
 
   async createMedia(input: Record<string, unknown>): Promise<void> {
@@ -1069,12 +1086,32 @@ class NeonDrizzleStore implements DataStore {
       mime_type: String(input.mime_type),
       file_size_bytes: Number(input.file_size_bytes || 0),
       alt_text: String(input.alt_text || ''),
+      file_data: String(input.file_data || ''),
     });
   }
 
   async getMediaById(id: string) {
-    const [row] = await this.db.select().from(schema.mediaLibrary).where(eq(schema.mediaLibrary.id, id)).limit(1);
-    return row ? { id: row.id, file_url: row.file_url, file_name: row.file_name } : null;
+    const [row] = await this.db
+      .select({ id: schema.mediaLibrary.id, file_url: schema.mediaLibrary.file_url, file_name: schema.mediaLibrary.file_name })
+      .from(schema.mediaLibrary)
+      .where(eq(schema.mediaLibrary.id, id))
+      .limit(1);
+    return row || null;
+  }
+
+  async getMediaContentById(id: string) {
+    const [row] = await this.db
+      .select({
+        id: schema.mediaLibrary.id,
+        file_url: schema.mediaLibrary.file_url,
+        file_name: schema.mediaLibrary.file_name,
+        mime_type: schema.mediaLibrary.mime_type,
+        file_data: schema.mediaLibrary.file_data,
+      })
+      .from(schema.mediaLibrary)
+      .where(eq(schema.mediaLibrary.id, id))
+      .limit(1);
+    return row || null;
   }
 
   async deleteMedia(id: string): Promise<void> {
@@ -1543,7 +1580,8 @@ class LocalSqliteStore implements DataStore {
 
   async updateProduct(id: string, input: Record<string, unknown>) {
     const existing = this.sqliteDb.prepare('SELECT id FROM products WHERE id = ?').get(id);
-    if (!existing) return false;
+    const existingRow = existing as { id: string; name?: string; sku?: string };
+    const resolvedSku = String(input.sku || existingRow.sku || `KN-${crypto.randomInt(10000, 99999)}`).trim();
     this.sqliteDb
       .prepare(`
         UPDATE products SET
@@ -1554,11 +1592,11 @@ class LocalSqliteStore implements DataStore {
         WHERE id = ?
       `)
       .run(
-        String(input.name).trim(),
-        String(input.sku).trim(),
+        String(input.name || existingRow.name || '').trim(),
+        resolvedSku,
         String(input.short_description || '').trim(),
         String(input.description || '').trim(),
-        Number(input.retail_price_cad),
+        Number(input.retail_price_cad ?? 0),
         input.compare_at_price_cad !== null && input.compare_at_price_cad !== '' ? Number(input.compare_at_price_cad) : null,
         Math.max(0, Math.floor(Number(input.stock_quantity) || 0)),
         input.is_published ? 1 : 0,
@@ -1567,11 +1605,13 @@ class LocalSqliteStore implements DataStore {
         String(input.seo_description || '').trim(),
         id
       );
-    if (String(input.image_url || '').trim()) {
+    if (input.image_url !== undefined) {
       this.sqliteDb.prepare('DELETE FROM product_images WHERE product_id = ?').run(id);
-      this.sqliteDb
-        .prepare('INSERT INTO product_images (id, product_id, image_url, alt_text, display_order, is_primary) VALUES (?, ?, ?, ?, 0, 1)')
-        .run(uid(), id, String(input.image_url).trim(), String(input.name).trim());
+      if (String(input.image_url || '').trim()) {
+        this.sqliteDb
+          .prepare('INSERT INTO product_images (id, product_id, image_url, alt_text, display_order, is_primary) VALUES (?, ?, ?, ?, 0, 1)')
+          .run(uid(), id, String(input.image_url).trim(), String(input.name || existingRow.name || '').trim());
+      }
     }
     if (Array.isArray(input.category_ids)) {
       this.sqliteDb.prepare('DELETE FROM product_categories WHERE product_id = ?').run(id);
@@ -1943,12 +1983,14 @@ class LocalSqliteStore implements DataStore {
   }
 
   async listMedia() {
-    return this.sqliteDb.prepare('SELECT * FROM media_library ORDER BY created_at DESC').all() as Array<Record<string, unknown>>;
+    return this.sqliteDb
+      .prepare('SELECT id, file_name, bucket, file_url, mime_type, file_size_bytes, alt_text, created_at FROM media_library ORDER BY created_at DESC')
+      .all() as Array<Record<string, unknown>>;
   }
 
   async createMedia(input: Record<string, unknown>) {
     this.sqliteDb
-      .prepare('INSERT INTO media_library (id, file_name, bucket, file_url, mime_type, file_size_bytes, alt_text) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .prepare('INSERT INTO media_library (id, file_name, bucket, file_url, mime_type, file_size_bytes, alt_text, file_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .run(
         String(input.id),
         String(input.file_name),
@@ -1956,12 +1998,21 @@ class LocalSqliteStore implements DataStore {
         String(input.file_url),
         String(input.mime_type),
         Number(input.file_size_bytes || 0),
-        String(input.alt_text || '')
+        String(input.alt_text || ''),
+        String(input.file_data || '')
       );
   }
 
   async getMediaById(id: string) {
     return (this.sqliteDb.prepare('SELECT id, file_url, file_name FROM media_library WHERE id = ?').get(id) as { id: string; file_url: string; file_name: string }) || null;
+  }
+
+  async getMediaContentById(id: string) {
+    return (
+      (this.sqliteDb
+        .prepare('SELECT id, file_url, file_name, mime_type, file_data FROM media_library WHERE id = ?')
+        .get(id) as { id: string; file_url: string; file_name: string; mime_type: string; file_data: string }) || null
+    );
   }
 
   async deleteMedia(id: string) {

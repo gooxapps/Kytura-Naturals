@@ -77,20 +77,30 @@ export const AdminContentSettingsSection: React.FC<AdminContentSettingsProps> = 
 
   const handleUploadMedia = async (file: File, bucket = 'media-library') => {
     setMsg('');
-    const fd = new FormData();
-    fd.append('file', file);
-    fd.append('bucket', bucket);
-    const res = await fetch('/api/admin/media', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: fd,
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setMsg(data.error || 'Upload failed.');
-    } else {
-      await onRefresh();
-      setMsg(`Uploaded ${data.asset.file_name}`);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('bucket', bucket);
+      const res = await fetch('/api/admin/media', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      const raw = await res.text();
+      let data: { error?: string; asset?: MediaAsset } = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        data = {};
+      }
+      if (!res.ok || !data.asset) {
+        setMsg(data.error || `Upload failed (HTTP ${res.status}).`);
+      } else {
+        await onRefresh();
+        setMsg(`Uploaded ${data.asset.file_name}`);
+      }
+    } catch {
+      setMsg('Network error while uploading image.');
     }
   };
 
@@ -363,7 +373,7 @@ export const AdminContentSettingsSection: React.FC<AdminContentSettingsProps> = 
           <div>
             <h2 className="font-display text-2xl font-bold text-[#0E021E]">Media Library</h2>
             <p className="text-xs text-[#0E021E]/65">
-              Upload validated JPG, PNG, WebP, AVIF, or ICO images (max 5 MB) for logos, favicons, products, categories, and banners.
+              Upload any image format (JPG, PNG, WebP, AVIF, GIF, SVG, BMP, HEIC, or ICO, max 15 MB) for logos, favicons, products, categories, and banners. Stored safely in the database.
             </p>
           </div>
           <label className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#5000AF] text-white text-xs font-semibold cursor-pointer hover:bg-[#39008B]">
@@ -371,11 +381,12 @@ export const AdminContentSettingsSection: React.FC<AdminContentSettingsProps> = 
             Upload Image
             <input
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/avif,.ico,image/x-icon,image/vnd.microsoft.icon"
+              accept="image/*,.ico,.svg,.heic,.heif"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) handleUploadMedia(f);
+                e.target.value = '';
               }}
             />
           </label>

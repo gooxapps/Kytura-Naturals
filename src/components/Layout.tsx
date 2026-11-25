@@ -28,12 +28,46 @@ const WhatsAppGlyph: React.FC<{ className?: string }> = ({ className = 'w-5 h-5'
   </svg>
 );
 
+function isExternalHref(href: string): boolean {
+  return /^(https?:\/\/|mailto:|tel:)/i.test((href || '').trim());
+}
+
+const SmartLink: React.FC<{
+  href: string;
+  openInNewTab?: boolean;
+  className?: string;
+  onClick?: () => void;
+  children: React.ReactNode;
+}> = ({ href, openInNewTab, className, onClick, children }) => {
+  const cleanHref = (href || '/').trim() || '/';
+  const external = isExternalHref(cleanHref) || Boolean(openInNewTab);
+
+  if (external) {
+    return (
+      <a
+        href={cleanHref}
+        target={openInNewTab || /^https?:\/\//i.test(cleanHref) ? '_blank' : undefined}
+        rel={openInNewTab || /^https?:\/\//i.test(cleanHref) ? 'noopener noreferrer' : undefined}
+        className={className}
+        onClick={onClick}
+      >
+        {children}
+      </a>
+    );
+  }
+
+  return (
+    <Link to={cleanHref} className={className} onClick={onClick}>
+      {children}
+    </Link>
+  );
+};
+
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { settings, categories, cartCount, setIsCartOpen } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [shopDropdownOpen, setShopDropdownOpen] = useState(false);
-  const [collectionsDropdownOpen, setCollectionsDropdownOpen] = useState(false);
+  const [openDropdownIndex, setOpenDropdownIndex] = useState<number | null>(null);
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -47,7 +81,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   const whatsappInquiryUrl = formatWhatsappHref(
     settings.whatsapp_number,
-    'Hello Kytura Naturals, I would like to make an enquiry about your products.'
+    `Hello ${settings.business_name}, I would like to make an enquiry about your products.`
   );
 
   const hasSocialLinks = Boolean(
@@ -57,6 +91,23 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       settings.social_pinterest
   );
 
+  const headerLinks = settings.header_links?.length
+    ? settings.header_links
+    : [
+        { label: 'Home', href: '/', type: 'link' as const },
+        { label: 'Shop', href: '/shop', type: 'shop_dropdown' as const },
+        {
+          label: 'Collections',
+          href: '/collections/diffuser-oil-blends',
+          type: 'collections_dropdown' as const,
+        },
+        { label: 'About Us', href: '/about', type: 'link' as const },
+        { label: 'Wholesale', href: '/wholesale', type: 'link' as const },
+        { label: 'FAQ', href: '/faq', type: 'link' as const },
+        { label: 'Contact', href: '/contact', type: 'link' as const },
+      ];
+
+  const footer = settings.footer_config;
   const isCheckoutPage = location.pathname === '/checkout';
 
   return (
@@ -99,149 +150,138 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       {/* B. Main Header */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#F3F0FF] shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-4">
-          <Link to="/" className="shrink-0" aria-label="Kytura Naturals Home">
+          <Link to="/" className="shrink-0" aria-label={`${settings.business_name} Home`}>
             <BrandLogo variant="dark" />
           </Link>
 
-          {/* Desktop Navigation */}
+          {/* Desktop Navigation (Admin-Managed) */}
           <nav className="hidden xl:flex items-center gap-5 text-sm font-medium text-[#0E021E]">
-            <NavLink
-              to="/"
-              end
-              className={({ isActive }) =>
-                `px-4 py-1.5 rounded-full transition-colors whitespace-nowrap ${
-                  isActive
-                    ? 'bg-[#5000AF] text-white font-semibold'
-                    : 'text-[#0E021E] hover:text-[#5000AF]'
-                }`
-              }
-            >
-              Home
-            </NavLink>
+            {headerLinks.map((item, idx) => {
+              const linkType = item.type || 'link';
+              const cleanHref = (item.href || '/').trim() || '/';
 
-            {/* Shop Dropdown */}
-            <div
-              className="relative"
-              onMouseEnter={() => setShopDropdownOpen(true)}
-              onMouseLeave={() => setShopDropdownOpen(false)}
-            >
-              <button
-                type="button"
-                onClick={() => navigate('/shop')}
-                className={`inline-flex items-center gap-1 py-1.5 whitespace-nowrap transition-colors ${
-                  location.pathname.startsWith('/shop')
-                    ? 'text-[#5000AF] font-semibold'
-                    : 'hover:text-[#5000AF]'
-                }`}
-              >
-                Shop
-                <ChevronDown className="w-3.5 h-3.5" />
-              </button>
-              {shopDropdownOpen && (
-                <div className="absolute left-0 top-full pt-2 w-60 z-50">
-                  <div className="bg-white rounded-xl border border-[#AA87FF]/25 shadow-xl py-2">
-                    <Link
-                      to="/shop"
-                      onClick={() => setShopDropdownOpen(false)}
-                      className="block px-4 py-2 text-sm font-semibold text-[#39008B] hover:bg-[#F3F0FF]"
+              if (linkType === 'shop_dropdown') {
+                return (
+                  <div
+                    key={`${item.label}-${idx}`}
+                    className="relative"
+                    onMouseEnter={() => setOpenDropdownIndex(idx)}
+                    onMouseLeave={() => setOpenDropdownIndex(null)}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => navigate(cleanHref)}
+                      className={`inline-flex items-center gap-1 py-1.5 whitespace-nowrap transition-colors ${
+                        location.pathname.startsWith('/shop')
+                          ? 'text-[#5000AF] font-semibold'
+                          : 'hover:text-[#5000AF]'
+                      }`}
                     >
-                      Shop All Products
-                    </Link>
-                    <div className="my-1 border-t border-[#F3F0FF]" />
-                    {categories.map((cat) => (
-                      <Link
-                        key={cat.id}
-                        to={`/collections/${cat.slug}`}
-                        onClick={() => setShopDropdownOpen(false)}
-                        className="block px-4 py-2 text-sm text-[#0E021E]/85 hover:bg-[#F3F0FF] hover:text-[#5000AF]"
-                      >
-                        {cat.name}
-                      </Link>
-                    ))}
+                      {item.label}
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </button>
+                    {openDropdownIndex === idx && (
+                      <div className="absolute left-0 top-full pt-2 w-60 z-50">
+                        <div className="bg-white rounded-xl border border-[#AA87FF]/25 shadow-xl py-2">
+                          <Link
+                            to={cleanHref}
+                            onClick={() => setOpenDropdownIndex(null)}
+                            className="block px-4 py-2 text-sm font-semibold text-[#39008B] hover:bg-[#F3F0FF]"
+                          >
+                            Shop All Products
+                          </Link>
+                          <div className="my-1 border-t border-[#F3F0FF]" />
+                          {categories.map((cat) => (
+                            <Link
+                              key={cat.id}
+                              to={`/collections/${cat.slug}`}
+                              onClick={() => setOpenDropdownIndex(null)}
+                              className="block px-4 py-2 text-sm text-[#0E021E]/85 hover:bg-[#F3F0FF] hover:text-[#5000AF]"
+                            >
+                              {cat.name}
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
-            </div>
+                );
+              }
 
-            {/* Collections Dropdown */}
-            <div
-              className="relative"
-              onMouseEnter={() => setCollectionsDropdownOpen(true)}
-              onMouseLeave={() => setCollectionsDropdownOpen(false)}
-            >
-              <button
-                type="button"
-                onClick={() => setCollectionsDropdownOpen((v) => !v)}
-                className={`inline-flex items-center gap-1 py-1.5 whitespace-nowrap transition-colors ${
-                  location.pathname.startsWith('/collections')
-                    ? 'text-[#5000AF] font-semibold'
-                    : 'hover:text-[#5000AF]'
-                }`}
-              >
-                Collections
-                <ChevronDown className="w-3.5 h-3.5" />
-              </button>
-              {collectionsDropdownOpen && (
-                <div className="absolute left-0 top-full pt-2 w-60 z-50">
-                  <div className="bg-white rounded-xl border border-[#AA87FF]/25 shadow-xl py-2">
-                    {categories.map((cat) => (
-                      <Link
-                        key={cat.id}
-                        to={`/collections/${cat.slug}`}
-                        onClick={() => setCollectionsDropdownOpen(false)}
-                        className="block px-4 py-2 text-sm text-[#0E021E]/85 hover:bg-[#F3F0FF] hover:text-[#5000AF]"
-                      >
-                        {cat.name}
-                      </Link>
-                    ))}
+              if (linkType === 'collections_dropdown') {
+                return (
+                  <div
+                    key={`${item.label}-${idx}`}
+                    className="relative"
+                    onMouseEnter={() => setOpenDropdownIndex(idx)}
+                    onMouseLeave={() => setOpenDropdownIndex(null)}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setOpenDropdownIndex((prev) => (prev === idx ? null : idx))}
+                      className={`inline-flex items-center gap-1 py-1.5 whitespace-nowrap transition-colors ${
+                        location.pathname.startsWith('/collections')
+                          ? 'text-[#5000AF] font-semibold'
+                          : 'hover:text-[#5000AF]'
+                      }`}
+                    >
+                      {item.label}
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </button>
+                    {openDropdownIndex === idx && (
+                      <div className="absolute left-0 top-full pt-2 w-60 z-50">
+                        <div className="bg-white rounded-xl border border-[#AA87FF]/25 shadow-xl py-2">
+                          {categories.map((cat) => (
+                            <Link
+                              key={cat.id}
+                              to={`/collections/${cat.slug}`}
+                              onClick={() => setOpenDropdownIndex(null)}
+                              className="block px-4 py-2 text-sm text-[#0E021E]/85 hover:bg-[#F3F0FF] hover:text-[#5000AF]"
+                            >
+                              {cat.name}
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
-            </div>
-
-            <NavLink
-              to="/about"
-              className={({ isActive }) =>
-                `whitespace-nowrap transition-colors ${
-                  isActive ? 'text-[#5000AF] font-semibold' : 'hover:text-[#5000AF]'
-                }`
+                );
               }
-            >
-              About Us
-            </NavLink>
 
-            <NavLink
-              to="/wholesale"
-              className={({ isActive }) =>
-                `whitespace-nowrap transition-colors ${
-                  isActive ? 'text-[#5000AF] font-semibold' : 'hover:text-[#5000AF]'
-                }`
+              if (isExternalHref(cleanHref) || item.open_in_new_tab) {
+                return (
+                  <SmartLink
+                    key={`${item.label}-${idx}`}
+                    href={cleanHref}
+                    openInNewTab={item.open_in_new_tab}
+                    className="whitespace-nowrap transition-colors hover:text-[#5000AF]"
+                  >
+                    {item.label}
+                  </SmartLink>
+                );
               }
-            >
-              Wholesale
-            </NavLink>
 
-            <NavLink
-              to="/faq"
-              className={({ isActive }) =>
-                `whitespace-nowrap transition-colors ${
-                  isActive ? 'text-[#5000AF] font-semibold' : 'hover:text-[#5000AF]'
-                }`
-              }
-            >
-              FAQ
-            </NavLink>
-
-            <NavLink
-              to="/contact"
-              className={({ isActive }) =>
-                `whitespace-nowrap transition-colors ${
-                  isActive ? 'text-[#5000AF] font-semibold' : 'hover:text-[#5000AF]'
-                }`
-              }
-            >
-              Contact
-            </NavLink>
+              return (
+                <NavLink
+                  key={`${item.label}-${idx}`}
+                  to={cleanHref}
+                  end={cleanHref === '/'}
+                  className={({ isActive }) =>
+                    cleanHref === '/'
+                      ? `px-4 py-1.5 rounded-full transition-colors whitespace-nowrap ${
+                          isActive
+                            ? 'bg-[#5000AF] text-white font-semibold'
+                            : 'text-[#0E021E] hover:text-[#5000AF]'
+                        }`
+                      : `whitespace-nowrap transition-colors ${
+                          isActive ? 'text-[#5000AF] font-semibold' : 'hover:text-[#5000AF]'
+                        }`
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              );
+            })}
           </nav>
 
           {/* Right Controls: Search + Account/Portals + Cart + Mobile Hamburger */}
@@ -359,26 +399,41 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 </form>
 
                 <div className="grid grid-cols-1 gap-1 text-sm font-medium">
-                  {[
-                    { to: '/', label: 'Home' },
-                    { to: '/shop', label: 'Shop All Products' },
-                    ...categories.map((c) => ({ to: `/collections/${c.slug}`, label: c.name })),
-                    { to: '/about', label: 'About Us' },
-                    { to: '/wholesale', label: 'Wholesale Information & Application' },
-                    { to: '/wholesale/portal', label: 'Wholesale Buyer Portal' },
-                    { to: '/faq', label: 'FAQ' },
-                    { to: '/contact', label: 'Contact' },
-                    { to: '/cart', label: `Shopping Cart (${cartCount})` },
-                  ].map((item) => (
-                    <Link
-                      key={item.to}
-                      to={item.to}
+                  {headerLinks.map((item, idx) => (
+                    <SmartLink
+                      key={`mob-${item.label}-${idx}`}
+                      href={item.href || '/'}
+                      openInNewTab={item.open_in_new_tab}
                       onClick={() => setMobileMenuOpen(false)}
                       className="px-3 py-2.5 rounded-xl hover:bg-[#F3F0FF] text-[#0E021E] hover:text-[#5000AF]"
                     >
                       {item.label}
+                    </SmartLink>
+                  ))}
+                  {categories.map((c) => (
+                    <Link
+                      key={`mob-cat-${c.id}`}
+                      to={`/collections/${c.slug}`}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="px-5 py-2 rounded-xl hover:bg-[#F3F0FF] text-xs text-[#0E021E]/75 hover:text-[#5000AF]"
+                    >
+                      · {c.name}
                     </Link>
                   ))}
+                  <Link
+                    to="/wholesale/portal"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="px-3 py-2.5 rounded-xl hover:bg-[#F3F0FF] text-[#0E021E] hover:text-[#5000AF]"
+                  >
+                    Wholesale Buyer Portal
+                  </Link>
+                  <Link
+                    to="/cart"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="px-3 py-2.5 rounded-xl hover:bg-[#F3F0FF] text-[#0E021E] hover:text-[#5000AF]"
+                  >
+                    Shopping Cart ({cartCount})
+                  </Link>
                 </div>
               </div>
             </motion.div>
@@ -389,7 +444,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       {/* Page Body */}
       <main className="flex-1">{children}</main>
 
-      {/* K. Footer matching reference image */}
+      {/* K. Dynamic Admin-Editable Footer matching reference image */}
       <footer className="bg-gradient-to-b from-[#2A0062] to-[#0E021E] text-white mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-8 items-start">
@@ -398,70 +453,120 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               <Link to="/" className="inline-block">
                 <BrandLogo variant="light" compact />
               </Link>
-              <p className="mt-4 text-xs text-white/70 leading-relaxed max-w-xs">
-                Organic diffuser oil blends, body &amp; massage oils, and ultrasonic diffusers. Founded by {settings.owner_name}.
-              </p>
+              {footer.description && (
+                <p className="mt-4 text-xs text-white/70 leading-relaxed max-w-xs">
+                  {footer.description}
+                </p>
+              )}
+              {footer.badge_image_url && (
+                <div className="mt-4">
+                  {footer.badge_href ? (
+                    <SmartLink
+                      href={footer.badge_href}
+                      className="inline-block rounded-xl overflow-hidden border border-white/15 hover:border-[#8ACE69] transition-colors"
+                    >
+                      <img
+                        src={footer.badge_image_url}
+                        alt={footer.badge_alt || settings.business_name}
+                        className="max-h-20 w-auto object-contain"
+                      />
+                    </SmartLink>
+                  ) : (
+                    <img
+                      src={footer.badge_image_url}
+                      alt={footer.badge_alt || settings.business_name}
+                      className="max-h-20 w-auto rounded-xl object-contain"
+                    />
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Quick Links */}
             <div className="lg:col-span-2">
-              <h3 className="font-display text-base font-semibold text-white mb-3">Quick Links</h3>
+              <h3 className="font-display text-base font-semibold text-white mb-3">
+                {footer.quick_links_title || 'Quick Links'}
+              </h3>
               <ul className="space-y-2 text-xs text-white/80">
-                <li><Link to="/" className="hover:text-[#8ACE69] transition-colors">Home</Link></li>
-                <li><Link to="/shop" className="hover:text-[#8ACE69] transition-colors">Shop</Link></li>
-                <li><Link to="/collections/diffuser-oil-blends" className="hover:text-[#8ACE69] transition-colors">Collections</Link></li>
-                <li><Link to="/about" className="hover:text-[#8ACE69] transition-colors">About Us</Link></li>
-                <li><Link to="/wholesale" className="hover:text-[#8ACE69] transition-colors">Wholesale</Link></li>
+                {(footer.quick_links || []).map((link, idx) => (
+                  <li key={`ql-${idx}`}>
+                    <SmartLink
+                      href={link.href}
+                      openInNewTab={link.open_in_new_tab}
+                      className="hover:text-[#8ACE69] transition-colors"
+                    >
+                      {link.label}
+                    </SmartLink>
+                  </li>
+                ))}
               </ul>
             </div>
 
             {/* Customer Care */}
             <div className="lg:col-span-2">
-              <h3 className="font-display text-base font-semibold text-white mb-3">Customer Care</h3>
+              <h3 className="font-display text-base font-semibold text-white mb-3">
+                {footer.customer_care_title || 'Customer Care'}
+              </h3>
               <ul className="space-y-2 text-xs text-white/80">
-                <li><Link to="/faq" className="hover:text-[#8ACE69] transition-colors">FAQ</Link></li>
-                <li><Link to="/shipping-returns" className="hover:text-[#8ACE69] transition-colors">Shipping &amp; Returns</Link></li>
-                <li><Link to="/privacy-policy" className="hover:text-[#8ACE69] transition-colors">Privacy Policy</Link></li>
-                <li><Link to="/terms-and-conditions" className="hover:text-[#8ACE69] transition-colors">Terms &amp; Conditions</Link></li>
-                <li><Link to="/contact" className="hover:text-[#8ACE69] transition-colors">Contact Us</Link></li>
+                {(footer.customer_care_links || []).map((link, idx) => (
+                  <li key={`cc-${idx}`}>
+                    <SmartLink
+                      href={link.href}
+                      openInNewTab={link.open_in_new_tab}
+                      className="hover:text-[#8ACE69] transition-colors"
+                    >
+                      {link.label}
+                    </SmartLink>
+                  </li>
+                ))}
               </ul>
             </div>
 
             {/* Contact Us */}
             <div className="lg:col-span-3">
-              <h3 className="font-display text-base font-semibold text-white mb-3">Contact Us</h3>
+              <h3 className="font-display text-base font-semibold text-white mb-3">
+                {footer.contact_title || 'Contact Us'}
+              </h3>
               <ul className="space-y-2.5 text-xs text-white/85">
-                <li>
-                  <a
-                    href={whatsappInquiryUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 hover:text-[#8ACE69] transition-colors tabular-nums"
-                  >
-                    <Phone className="w-3.5 h-3.5 text-[#AA87FF] shrink-0" />
-                    <span>{formatPhoneDisplay(settings.whatsapp_number)}</span>
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href={`mailto:${settings.email}`}
-                    className="inline-flex items-center gap-2 hover:text-[#8ACE69] transition-colors"
-                  >
-                    <Mail className="w-3.5 h-3.5 text-[#AA87FF] shrink-0" />
-                    <span>{settings.email}</span>
-                  </a>
-                </li>
-                <li className="inline-flex items-center gap-2 text-white/80">
-                  <MapPin className="w-3.5 h-3.5 text-[#AA87FF] shrink-0" />
-                  <span>{settings.region_label}</span>
-                </li>
+                {footer.show_contact_phone !== false && (
+                  <li>
+                    <a
+                      href={whatsappInquiryUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 hover:text-[#8ACE69] transition-colors tabular-nums"
+                    >
+                      <Phone className="w-3.5 h-3.5 text-[#AA87FF] shrink-0" />
+                      <span>{formatPhoneDisplay(settings.whatsapp_number)}</span>
+                    </a>
+                  </li>
+                )}
+                {footer.show_contact_email !== false && (
+                  <li>
+                    <a
+                      href={`mailto:${settings.email}`}
+                      className="inline-flex items-center gap-2 hover:text-[#8ACE69] transition-colors"
+                    >
+                      <Mail className="w-3.5 h-3.5 text-[#AA87FF] shrink-0" />
+                      <span>{settings.email}</span>
+                    </a>
+                  </li>
+                )}
+                {footer.show_contact_region !== false && (
+                  <li className="inline-flex items-center gap-2 text-white/80">
+                    <MapPin className="w-3.5 h-3.5 text-[#AA87FF] shrink-0" />
+                    <span>{settings.region_label}</span>
+                  </li>
+                )}
               </ul>
             </div>
 
-            {/* Stay Connected + Developer Credit */}
+            {/* Stay Connected + Extra Footer Links */}
             <div className="lg:col-span-2 flex flex-col justify-between h-full">
               <div>
-                <h3 className="font-display text-base font-semibold text-white mb-3">Stay Connected</h3>
+                <h3 className="font-display text-base font-semibold text-white mb-3">
+                  {footer.social_title || 'Stay Connected'}
+                </h3>
                 {hasSocialLinks ? (
                   <div className="flex items-center gap-2.5 mb-3">
                     {settings.social_facebook && (
@@ -511,22 +616,26 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                   </div>
                 ) : null}
                 <div className="space-y-1.5 text-xs text-white/75">
-                  <Link to="/#newsletter" className="block hover:text-[#8ACE69] transition-colors">
-                    Newsletter Sign-up
-                  </Link>
-                  <Link to="/wholesale/portal" className="block hover:text-[#8ACE69] transition-colors">
-                    Wholesale Portal
-                  </Link>
-                  <Link to="/admin" className="block text-white/55 hover:text-white transition-colors">
-                    Admin Dashboard
-                  </Link>
+                  {(footer.extra_links || []).map((link, idx) => (
+                    <SmartLink
+                      key={`extra-${idx}`}
+                      href={link.href}
+                      openInNewTab={link.open_in_new_tab}
+                      className="block hover:text-[#8ACE69] transition-colors"
+                    >
+                      {link.label}
+                    </SmartLink>
+                  ))}
                 </div>
               </div>
             </div>
           </div>
 
           <div className="mt-10 pt-5 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-white/55">
-            <p>© {new Date().getFullYear()} {settings.business_name}. All rights reserved. Prices in {settings.currency}.</p>
+            <p>
+              {footer.copyright_text?.trim() ||
+                `© ${new Date().getFullYear()} ${settings.business_name}. All rights reserved. Prices in ${settings.currency}.`}
+            </p>
             <p className="text-white/50 tracking-wide">
               Developed by Emmanuel Kenny | StaySafelite
             </p>
@@ -542,7 +651,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         href={whatsappInquiryUrl}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label="Chat with Kytura Naturals on WhatsApp"
+        aria-label={`Chat with ${settings.business_name} on WhatsApp`}
         className={`fixed right-4 sm:right-6 z-40 group flex items-center gap-2.5 ${
           isCheckoutPage ? 'bottom-20 sm:bottom-6' : 'bottom-5 sm:bottom-6'
         }`}

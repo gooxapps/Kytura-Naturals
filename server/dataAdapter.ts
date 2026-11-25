@@ -5,6 +5,7 @@ import { getNeonDb, isNeonConfigured } from './neonDb.ts';
 import { ensureNeonSchemaAndSeed } from './migrate.ts';
 import { getSqliteDb, initDatabase as initSqlite } from './db.ts';
 import { uid, hashPassword } from './crypto.ts';
+import { normalizeFooterConfig, normalizeHeaderLinks, normalizeSiteSettings } from './siteDefaults.ts';
 
 export interface DbUser {
   id: string;
@@ -213,32 +214,37 @@ class NeonDrizzleStore implements DataStore {
 
   async getSettings(): Promise<Record<string, unknown>> {
     const [row] = await this.db.select().from(schema.siteSettings).where(eq(schema.siteSettings.id, 1)).limit(1);
-    if (!row) return {};
-    return {
-      ...row,
-      free_shipping_threshold_cad: Number(row.free_shipping_threshold_cad),
-    };
+    return normalizeSiteSettings(row as unknown as Record<string, unknown> | undefined);
   }
 
   async updateSettings(s: Record<string, unknown>): Promise<void> {
+    const current = await this.getSettings();
+    const merged = { ...current, ...s };
     await this.db
       .update(schema.siteSettings)
       .set({
-        business_name: String(s.business_name || 'Kytura Naturals').trim(),
-        owner_name: String(s.owner_name || 'Dr Ann Merah').trim(),
-        email: String(s.email || 'kyturanaturals@gmail.com').trim(),
-        whatsapp_number: String(s.whatsapp_number || '+14033719687').trim(),
-        currency: String(s.currency || 'CAD').trim(),
-        region_label: String(s.region_label || 'Global / All Regions').trim(),
-        announcement_left: String(s.announcement_left || '').trim(),
-        announcement_center: String(s.announcement_center || '').trim(),
-        free_shipping_threshold_cad: String(Number(s.free_shipping_threshold_cad ?? 100).toFixed(2)),
-        seo_title: String(s.seo_title || '').trim(),
-        seo_description: String(s.seo_description || '').trim(),
-        social_facebook: String(s.social_facebook || '').trim(),
-        social_instagram: String(s.social_instagram || '').trim(),
-        social_youtube: String(s.social_youtube || '').trim(),
-        social_pinterest: String(s.social_pinterest || '').trim(),
+        business_name: String(merged.business_name || 'Kytura Naturals').trim(),
+        brand_tagline: String(merged.brand_tagline ?? 'BOTANICAL WELLNESS · NATURAL LIVING').trim(),
+        owner_name: String(merged.owner_name || 'Dr Ann Merah').trim(),
+        email: String(merged.email || 'kyturanaturals@gmail.com').trim(),
+        whatsapp_number: String(merged.whatsapp_number || '+14033719687').trim(),
+        currency: String(merged.currency || 'CAD').trim(),
+        region_label: String(merged.region_label || 'Global / All Regions').trim(),
+        announcement_left: String(merged.announcement_left || '').trim(),
+        announcement_center: String(merged.announcement_center || '').trim(),
+        free_shipping_threshold_cad: String(Number(merged.free_shipping_threshold_cad ?? 100).toFixed(2)),
+        seo_title: String(merged.seo_title || '').trim(),
+        seo_description: String(merged.seo_description || '').trim(),
+        social_facebook: String(merged.social_facebook || '').trim(),
+        social_instagram: String(merged.social_instagram || '').trim(),
+        social_youtube: String(merged.social_youtube || '').trim(),
+        social_pinterest: String(merged.social_pinterest || '').trim(),
+        logo_light_url: String(merged.logo_light_url || '').trim(),
+        logo_dark_url: String(merged.logo_dark_url || '').trim(),
+        brand_icon_url: String(merged.brand_icon_url || '').trim(),
+        favicon_url: String(merged.favicon_url || '').trim(),
+        header_links: normalizeHeaderLinks(merged.header_links) as unknown as Array<Record<string, unknown>>,
+        footer_config: normalizeFooterConfig(merged.footer_config) as unknown as Record<string, unknown>,
         updated_at: new Date(),
       })
       .where(eq(schema.siteSettings.id, 1));
@@ -1193,36 +1199,48 @@ class LocalSqliteStore implements DataStore {
   }
 
   async getSettings() {
-    return (this.sqliteDb.prepare('SELECT * FROM site_settings WHERE id = 1').get() as Record<string, unknown>) || {};
+    const row = this.sqliteDb.prepare('SELECT * FROM site_settings WHERE id = 1').get() as Record<string, unknown> | undefined;
+    return normalizeSiteSettings(row);
   }
 
   async updateSettings(s: Record<string, unknown>) {
+    const current = await this.getSettings();
+    const merged = { ...current, ...s };
     this.sqliteDb
       .prepare(`
         UPDATE site_settings SET
-          business_name = ?, owner_name = ?, email = ?, whatsapp_number = ?,
+          business_name = ?, brand_tagline = ?, owner_name = ?, email = ?, whatsapp_number = ?,
           currency = ?, region_label = ?, announcement_left = ?, announcement_center = ?,
           free_shipping_threshold_cad = ?, seo_title = ?, seo_description = ?,
           social_facebook = ?, social_instagram = ?, social_youtube = ?, social_pinterest = ?,
+          logo_light_url = ?, logo_dark_url = ?, brand_icon_url = ?, favicon_url = ?,
+          header_links = ?, footer_config = ?,
           updated_at = datetime('now')
         WHERE id = 1
       `)
       .run(
-        String(s.business_name || 'Kytura Naturals').trim(),
-        String(s.owner_name || 'Dr Ann Merah').trim(),
-        String(s.email || 'kyturanaturals@gmail.com').trim(),
-        String(s.whatsapp_number || '+14033719687').trim(),
-        String(s.currency || 'CAD').trim(),
-        String(s.region_label || 'Global / All Regions').trim(),
-        String(s.announcement_left || '').trim(),
-        String(s.announcement_center || '').trim(),
-        Number(s.free_shipping_threshold_cad ?? 100),
-        String(s.seo_title || '').trim(),
-        String(s.seo_description || '').trim(),
-        String(s.social_facebook || '').trim(),
-        String(s.social_instagram || '').trim(),
-        String(s.social_youtube || '').trim(),
-        String(s.social_pinterest || '').trim()
+        String(merged.business_name || 'Kytura Naturals').trim(),
+        String(merged.brand_tagline ?? 'BOTANICAL WELLNESS · NATURAL LIVING').trim(),
+        String(merged.owner_name || 'Dr Ann Merah').trim(),
+        String(merged.email || 'kyturanaturals@gmail.com').trim(),
+        String(merged.whatsapp_number || '+14033719687').trim(),
+        String(merged.currency || 'CAD').trim(),
+        String(merged.region_label || 'Global / All Regions').trim(),
+        String(merged.announcement_left || '').trim(),
+        String(merged.announcement_center || '').trim(),
+        Number(merged.free_shipping_threshold_cad ?? 100),
+        String(merged.seo_title || '').trim(),
+        String(merged.seo_description || '').trim(),
+        String(merged.social_facebook || '').trim(),
+        String(merged.social_instagram || '').trim(),
+        String(merged.social_youtube || '').trim(),
+        String(merged.social_pinterest || '').trim(),
+        String(merged.logo_light_url || '').trim(),
+        String(merged.logo_dark_url || '').trim(),
+        String(merged.brand_icon_url || '').trim(),
+        String(merged.favicon_url || '').trim(),
+        JSON.stringify(normalizeHeaderLinks(merged.header_links)),
+        JSON.stringify(normalizeFooterConfig(merged.footer_config))
       );
   }
 

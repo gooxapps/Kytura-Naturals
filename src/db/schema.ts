@@ -269,6 +269,7 @@ export const wholesaleQuotations = pgTable('wholesale_quotations', {
 export const siteSettings = pgTable('site_settings', {
   id: integer('id').primaryKey(),
   business_name: text('business_name').notNull().default('Kytura Naturals'),
+  brand_tagline: text('brand_tagline').notNull().default('BOTANICAL WELLNESS · NATURAL LIVING'),
   owner_name: text('owner_name').notNull().default('Dr Ann Merah'),
   email: text('email').notNull().default('kyturanaturals@gmail.com'),
   whatsapp_number: text('whatsapp_number').notNull().default('+14033719687'),
@@ -283,6 +284,12 @@ export const siteSettings = pgTable('site_settings', {
   social_instagram: text('social_instagram').notNull().default(''),
   social_youtube: text('social_youtube').notNull().default(''),
   social_pinterest: text('social_pinterest').notNull().default(''),
+  logo_light_url: text('logo_light_url').notNull().default(''),
+  logo_dark_url: text('logo_dark_url').notNull().default(''),
+  brand_icon_url: text('brand_icon_url').notNull().default(''),
+  favicon_url: text('favicon_url').notNull().default(''),
+  header_links: jsonb('header_links').$type<Array<Record<string, unknown>>>().notNull().default([]),
+  footer_config: jsonb('footer_config').$type<Record<string, unknown>>().notNull().default({}),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

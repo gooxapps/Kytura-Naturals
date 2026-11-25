@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { count } from 'drizzle-orm';
 import { getNeonDb, getNeonSqlClient, isNeonConfigured } from './neonDb.ts';
 import * as schema from '../src/db/schema.ts';
+import { DEFAULT_FOOTER_CONFIG, DEFAULT_HEADER_LINKS } from './siteDefaults.ts';
 
 const PG_DDL_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS users (
@@ -190,6 +191,7 @@ const PG_DDL_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS site_settings (
     id INTEGER PRIMARY KEY,
     business_name TEXT NOT NULL DEFAULT 'Kytura Naturals',
+    brand_tagline TEXT NOT NULL DEFAULT 'BOTANICAL WELLNESS · NATURAL LIVING',
     owner_name TEXT NOT NULL DEFAULT 'Dr Ann Merah',
     email TEXT NOT NULL DEFAULT 'kyturanaturals@gmail.com',
     whatsapp_number TEXT NOT NULL DEFAULT '+14033719687',
@@ -204,8 +206,21 @@ const PG_DDL_STATEMENTS = [
     social_instagram TEXT NOT NULL DEFAULT '',
     social_youtube TEXT NOT NULL DEFAULT '',
     social_pinterest TEXT NOT NULL DEFAULT '',
+    logo_light_url TEXT NOT NULL DEFAULT '',
+    logo_dark_url TEXT NOT NULL DEFAULT '',
+    brand_icon_url TEXT NOT NULL DEFAULT '',
+    favicon_url TEXT NOT NULL DEFAULT '',
+    header_links JSONB NOT NULL DEFAULT '[]'::jsonb,
+    footer_config JSONB NOT NULL DEFAULT '{}'::jsonb,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );`,
+  `ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS brand_tagline TEXT NOT NULL DEFAULT 'BOTANICAL WELLNESS · NATURAL LIVING';`,
+  `ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS logo_light_url TEXT NOT NULL DEFAULT '';`,
+  `ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS logo_dark_url TEXT NOT NULL DEFAULT '';`,
+  `ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS brand_icon_url TEXT NOT NULL DEFAULT '';`,
+  `ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS favicon_url TEXT NOT NULL DEFAULT '';`,
+  `ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS header_links JSONB NOT NULL DEFAULT '[]'::jsonb;`,
+  `ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS footer_config JSONB NOT NULL DEFAULT '{}'::jsonb;`,
   `CREATE TABLE IF NOT EXISTS homepage_sections (
     id TEXT PRIMARY KEY,
     section_key TEXT NOT NULL UNIQUE,
@@ -307,6 +322,8 @@ export async function ensureNeonSchemaAndSeed(): Promise<void> {
       announcement_left: 'Discover Natural Wellness with Kytura Naturals',
       announcement_center: 'Free Worldwide Shipping on Orders Over $100 CAD',
       free_shipping_threshold_cad: '100.00',
+      header_links: DEFAULT_HEADER_LINKS as unknown as Array<Record<string, unknown>>,
+      footer_config: DEFAULT_FOOTER_CONFIG as unknown as Record<string, unknown>,
     })
     .onConflictDoNothing();
 

@@ -49,6 +49,7 @@ interface StoreContextValue {
 const DEFAULT_SETTINGS: SiteSettings = {
   id: 1,
   business_name: 'Kytura Naturals',
+  brand_tagline: 'BOTANICAL WELLNESS · NATURAL LIVING',
   owner_name: 'Dr Ann Merah',
   email: 'kyturanaturals@gmail.com',
   whatsapp_number: '+14033719687',
@@ -63,6 +64,52 @@ const DEFAULT_SETTINGS: SiteSettings = {
   social_instagram: '',
   social_youtube: '',
   social_pinterest: '',
+  logo_light_url: '',
+  logo_dark_url: '',
+  brand_icon_url: '',
+  favicon_url: '',
+  header_links: [
+    { label: 'Home', href: '/', type: 'link' },
+    { label: 'Shop', href: '/shop', type: 'shop_dropdown' },
+    { label: 'Collections', href: '/collections/diffuser-oil-blends', type: 'collections_dropdown' },
+    { label: 'About Us', href: '/about', type: 'link' },
+    { label: 'Wholesale', href: '/wholesale', type: 'link' },
+    { label: 'FAQ', href: '/faq', type: 'link' },
+    { label: 'Contact', href: '/contact', type: 'link' },
+  ],
+  footer_config: {
+    description: 'Organic diffuser oil blends, body & massage oils, and ultrasonic diffusers. Founded by Dr Ann Merah.',
+    badge_image_url: '',
+    badge_alt: '',
+    badge_href: '',
+    quick_links_title: 'Quick Links',
+    quick_links: [
+      { label: 'Home', href: '/' },
+      { label: 'Shop', href: '/shop' },
+      { label: 'Collections', href: '/collections/diffuser-oil-blends' },
+      { label: 'About Us', href: '/about' },
+      { label: 'Wholesale', href: '/wholesale' },
+    ],
+    customer_care_title: 'Customer Care',
+    customer_care_links: [
+      { label: 'FAQ', href: '/faq' },
+      { label: 'Shipping & Returns', href: '/shipping-returns' },
+      { label: 'Privacy Policy', href: '/privacy-policy' },
+      { label: 'Terms & Conditions', href: '/terms-and-conditions' },
+      { label: 'Contact Us', href: '/contact' },
+    ],
+    contact_title: 'Contact Us',
+    show_contact_phone: true,
+    show_contact_email: true,
+    show_contact_region: true,
+    social_title: 'Stay Connected',
+    extra_links: [
+      { label: 'Newsletter Sign-up', href: '/#newsletter' },
+      { label: 'Wholesale Portal', href: '/wholesale/portal' },
+      { label: 'Admin Dashboard', href: '/admin' },
+    ],
+    copyright_text: '',
+  },
 };
 
 const StoreContext = createContext<StoreContextValue | null>(null);
@@ -130,6 +177,31 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     refreshBootstrap();
   }, [refreshBootstrap]);
+
+  // Sync dynamic site favicon & apple-touch-icon whenever settings change
+  useEffect(() => {
+    const iconUrl = (settings.favicon_url || settings.brand_icon_url || '').trim();
+    const existingIcon = document.getElementById('kytura-dynamic-favicon') as HTMLLinkElement | null;
+    const existingApple = document.getElementById('kytura-dynamic-apple-icon') as HTMLLinkElement | null;
+
+    if (!iconUrl) {
+      if (existingIcon) existingIcon.remove();
+      if (existingApple) existingApple.remove();
+      return;
+    }
+
+    const linkIcon = existingIcon || document.createElement('link');
+    linkIcon.id = 'kytura-dynamic-favicon';
+    linkIcon.rel = 'icon';
+    linkIcon.href = iconUrl;
+    if (!existingIcon) document.head.appendChild(linkIcon);
+
+    const appleIcon = existingApple || document.createElement('link');
+    appleIcon.id = 'kytura-dynamic-apple-icon';
+    appleIcon.rel = 'apple-touch-icon';
+    appleIcon.href = iconUrl;
+    if (!existingApple) document.head.appendChild(appleIcon);
+  }, [settings.favicon_url, settings.brand_icon_url]);
 
   useEffect(() => {
     try {

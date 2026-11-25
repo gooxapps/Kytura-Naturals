@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, Copy, Plus, Trash2, Upload, X } from 'lucide-react';
 import { ResilientImage } from '../../components/ProductCard';
+import { MediaPickerInput } from '../../components/admin/MediaPickerInput';
 import type {
   ActivityLog,
   AdminRole,
@@ -195,19 +196,17 @@ export const AdminContentSettingsSection: React.FC<AdminContentSettingsProps> = 
                 />
               </div>
 
-              {editingSection.section_key === 'brand_story' && (
-                <div>
-                  <label className="block text-xs font-semibold mb-1">Body Copy</label>
-                  <textarea
-                    rows={4}
-                    value={editingSection.body}
-                    onChange={(e) =>
-                      setEditingSection({ ...editingSection, body: e.target.value })
-                    }
-                    className="w-full px-3 py-2 rounded-xl border border-[#AA87FF]/45 text-sm"
-                  />
-                </div>
-              )}
+              <div>
+                <label className="block text-xs font-semibold mb-1">Body Copy (Optional)</label>
+                <textarea
+                  rows={3}
+                  value={editingSection.body || ''}
+                  onChange={(e) =>
+                    setEditingSection({ ...editingSection, body: e.target.value })
+                  }
+                  className="w-full px-3 py-2 rounded-xl border border-[#AA87FF]/45 text-sm"
+                />
+              </div>
 
               {editingSection.section_key === 'benefits' && (
                 <div className="space-y-2 border-t border-[#F3F0FF] pt-3">
@@ -286,46 +285,43 @@ export const AdminContentSettingsSection: React.FC<AdminContentSettingsProps> = 
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold mb-1">Section Image URL</label>
-                <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold mb-1">Secondary CTA Label</label>
                   <input
                     type="text"
-                    value={editingSection.image_url || ''}
+                    value={editingSection.cta_secondary_label || ''}
                     onChange={(e) =>
-                      setEditingSection({ ...editingSection, image_url: e.target.value })
+                      setEditingSection({ ...editingSection, cta_secondary_label: e.target.value })
                     }
-                    className="flex-1 px-3 py-2 rounded-xl border border-[#AA87FF]/45 text-xs"
+                    className="w-full px-3 py-2 rounded-xl border border-[#AA87FF]/45 text-xs"
                   />
-                  <label className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-[#F3F0FF] text-[#39008B] text-xs font-semibold cursor-pointer">
-                    <Upload className="w-3.5 h-3.5" />
-                    Upload
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/avif"
-                      className="hidden"
-                      onChange={async (e) => {
-                        const f = e.target.files?.[0];
-                        if (!f) return;
-                        const fd = new FormData();
-                        fd.append('file', f);
-                        fd.append('bucket', 'homepage-banners');
-                        const res = await fetch('/api/admin/media', {
-                          method: 'POST',
-                          headers: { Authorization: `Bearer ${token}` },
-                          body: fd,
-                        });
-                        const d = await res.json();
-                        if (res.ok) {
-                          setEditingSection((prev) =>
-                            prev ? { ...prev, image_url: d.asset.file_url } : prev
-                          );
-                        }
-                      }}
-                    />
-                  </label>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1">Secondary CTA Link</label>
+                  <input
+                    type="text"
+                    value={editingSection.cta_secondary_href || ''}
+                    onChange={(e) =>
+                      setEditingSection({ ...editingSection, cta_secondary_href: e.target.value })
+                    }
+                    className="w-full px-3 py-2 rounded-xl border border-[#AA87FF]/45 text-xs"
+                  />
                 </div>
               </div>
+
+              <MediaPickerInput
+                label="Section Image (URL, Upload, or Media Library)"
+                value={editingSection.image_url || ''}
+                onChange={(url) =>
+                  setEditingSection((prev) => (prev ? { ...prev, image_url: url } : prev))
+                }
+                token={token}
+                media={media}
+                onMediaUploaded={onRefresh}
+                bucket="homepage-banners"
+                previewContain={false}
+              />
 
               <label className="flex items-center gap-2 text-xs font-semibold">
                 <input
@@ -367,7 +363,7 @@ export const AdminContentSettingsSection: React.FC<AdminContentSettingsProps> = 
           <div>
             <h2 className="font-display text-2xl font-bold text-[#0E021E]">Media Library</h2>
             <p className="text-xs text-[#0E021E]/65">
-              Upload validated JPG, PNG, WebP, or AVIF images (max 5 MB) for products, categories, and banners.
+              Upload validated JPG, PNG, WebP, AVIF, or ICO images (max 5 MB) for logos, favicons, products, categories, and banners.
             </p>
           </div>
           <label className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#5000AF] text-white text-xs font-semibold cursor-pointer hover:bg-[#39008B]">
@@ -375,7 +371,7 @@ export const AdminContentSettingsSection: React.FC<AdminContentSettingsProps> = 
             Upload Image
             <input
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/avif"
+              accept="image/jpeg,image/png,image/webp,image/avif,.ico,image/x-icon,image/vnd.microsoft.icon"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -695,6 +691,16 @@ export const AdminContentSettingsSection: React.FC<AdminContentSettingsProps> = 
             onChange={(e) => setNewTestimonial({ ...newTestimonial, quote: e.target.value })}
             className="w-full px-3 py-2 rounded-xl border text-xs"
           />
+          <MediaPickerInput
+            label="Customer Avatar Photo (Optional)"
+            value={newTestimonial.avatar_url}
+            onChange={(url) => setNewTestimonial({ ...newTestimonial, avatar_url: url })}
+            token={token}
+            media={media}
+            onMediaUploaded={onRefresh}
+            bucket="testimonials"
+            previewContain={false}
+          />
           <button
             type="submit"
             className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-[#5000AF] text-white text-xs font-semibold"
@@ -865,6 +871,17 @@ export const AdminContentSettingsSection: React.FC<AdminContentSettingsProps> = 
                 className="w-full px-3 py-2 rounded-xl border tabular-nums"
               />
             </div>
+            <div>
+              <label className="block font-semibold mb-1">Market / Region Label</label>
+              <input
+                type="text"
+                value={settingsForm.region_label}
+                onChange={(e) =>
+                  setSettingsForm({ ...settingsForm, region_label: e.target.value })
+                }
+                className="w-full px-3 py-2 rounded-xl border"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-[#F3F0FF]">
@@ -914,6 +931,30 @@ export const AdminContentSettingsSection: React.FC<AdminContentSettingsProps> = 
                   setSettingsForm({ ...settingsForm, social_facebook: e.target.value })
                 }
                 placeholder="https://facebook.com/..."
+                className="w-full px-3 py-2 rounded-xl border"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">YouTube URL (Optional)</label>
+              <input
+                type="text"
+                value={settingsForm.social_youtube}
+                onChange={(e) =>
+                  setSettingsForm({ ...settingsForm, social_youtube: e.target.value })
+                }
+                placeholder="https://youtube.com/..."
+                className="w-full px-3 py-2 rounded-xl border"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">Pinterest URL (Optional)</label>
+              <input
+                type="text"
+                value={settingsForm.social_pinterest}
+                onChange={(e) =>
+                  setSettingsForm({ ...settingsForm, social_pinterest: e.target.value })
+                }
+                placeholder="https://pinterest.com/..."
                 className="w-full px-3 py-2 rounded-xl border"
               />
             </div>

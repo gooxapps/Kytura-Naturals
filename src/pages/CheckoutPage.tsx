@@ -57,9 +57,6 @@ export const CheckoutPage: React.FC = () => {
       } else {
         setReceipt(data.order);
         clearCart();
-        // Open WhatsApp with prefilled order message (safe fallback link also displayed)
-        const opened = window.open(data.order.whatsapp_url, '_blank', 'noopener,noreferrer');
-        void opened;
       }
     } catch {
       setError('Network error while saving your order. Please try again.');

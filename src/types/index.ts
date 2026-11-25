@@ -26,9 +26,41 @@ export type WholesaleInquiryStatus =
   | 'Fulfilled'
   | 'Closed';
 
+export interface HeaderNavLink {
+  label: string;
+  href: string;
+  type?: 'link' | 'shop_dropdown' | 'collections_dropdown';
+  open_in_new_tab?: boolean;
+}
+
+export interface FooterLink {
+  label: string;
+  href: string;
+  open_in_new_tab?: boolean;
+}
+
+export interface FooterConfig {
+  description: string;
+  badge_image_url: string;
+  badge_alt: string;
+  badge_href: string;
+  quick_links_title: string;
+  quick_links: FooterLink[];
+  customer_care_title: string;
+  customer_care_links: FooterLink[];
+  contact_title: string;
+  show_contact_phone: boolean;
+  show_contact_email: boolean;
+  show_contact_region: boolean;
+  social_title: string;
+  extra_links: FooterLink[];
+  copyright_text: string;
+}
+
 export interface SiteSettings {
   id: number;
   business_name: string;
+  brand_tagline: string;
   owner_name: string;
   email: string;
   whatsapp_number: string;
@@ -43,6 +75,12 @@ export interface SiteSettings {
   social_instagram: string;
   social_youtube: string;
   social_pinterest: string;
+  logo_light_url: string;
+  logo_dark_url: string;
+  brand_icon_url: string;
+  favicon_url: string;
+  header_links: HeaderNavLink[];
+  footer_config: FooterConfig;
 }
 
 export interface Category {

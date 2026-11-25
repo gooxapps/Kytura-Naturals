@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { Edit2, Plus, Trash2, Upload, X } from 'lucide-react';
+import { Edit2, Plus, Trash2, X } from 'lucide-react';
 import { formatCad } from '../../context/StoreContext';
 import { ResilientImage } from '../../components/ProductCard';
-import type { Category, Product } from '../../types';
+import { MediaPickerInput } from '../../components/admin/MediaPickerInput';
+import type { Category, MediaAsset, Product } from '../../types';
 
 interface AdminCatalogSectionProps {
   token: string;
   mode: 'products' | 'categories';
   products: Product[];
   categories: Category[];
+  media?: MediaAsset[];
   onRefresh: () => Promise<void>;
 }
 
@@ -17,40 +19,13 @@ export const AdminCatalogSection: React.FC<AdminCatalogSectionProps> = ({
   mode,
   products,
   categories,
+  media = [],
   onRefresh,
 }) => {
   const [editingProduct, setEditingProduct] = useState<Partial<Product> & { image_url?: string } | null>(null);
   const [editingCategory, setEditingCategory] = useState<Partial<Category> | null>(null);
-  const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
-
-  const handleImageUpload = async (
-    file: File,
-    bucket: string,
-    onUrl: (url: string) => void
-  ) => {
-    setUploading(true);
-    setStatusMsg('');
-    try {
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('bucket', bucket);
-      const res = await fetch('/api/admin/media', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setStatusMsg(data.error || 'Image upload failed.');
-      } else {
-        onUrl(data.asset.file_url);
-      }
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -249,36 +224,18 @@ export const AdminCatalogSection: React.FC<AdminCatalogSectionProps> = ({
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold mb-1">Image URL or Upload</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={editingCategory.image_url || ''}
-                    onChange={(e) =>
-                      setEditingCategory({ ...editingCategory, image_url: e.target.value })
-                    }
-                    className="flex-1 px-3 py-2 rounded-xl border border-[#AA87FF]/45 text-xs"
-                  />
-                  <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#F3F0FF] text-[#39008B] text-xs font-semibold cursor-pointer">
-                    <Upload className="w-3.5 h-3.5" />
-                    {uploading ? '...' : 'Upload'}
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/avif"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) {
-                          handleImageUpload(f, 'category-images', (url) =>
-                            setEditingCategory((prev) => ({ ...prev, image_url: url }))
-                          );
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
-              </div>
+              <MediaPickerInput
+                label="Category Image (URL, Upload, or Media Library)"
+                value={editingCategory.image_url || ''}
+                onChange={(url) =>
+                  setEditingCategory((prev) => (prev ? { ...prev, image_url: url } : prev))
+                }
+                token={token}
+                media={media}
+                onMediaUploaded={onRefresh}
+                bucket="category-images"
+                previewContain={false}
+              />
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -560,36 +517,18 @@ export const AdminCatalogSection: React.FC<AdminCatalogSectionProps> = ({
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold mb-1">Product Image URL or Upload</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={editingProduct.image_url || ''}
-                  onChange={(e) =>
-                    setEditingProduct({ ...editingProduct, image_url: e.target.value })
-                  }
-                  className="flex-1 px-3 py-2 rounded-xl border border-[#AA87FF]/45 text-xs"
-                />
-                <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#F3F0FF] text-[#39008B] text-xs font-semibold cursor-pointer">
-                  <Upload className="w-3.5 h-3.5" />
-                  {uploading ? '...' : 'Upload'}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/avif"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) {
-                        handleImageUpload(f, 'product-images', (url) =>
-                          setEditingProduct((prev) => ({ ...prev, image_url: url }))
-                        );
-                      }
-                    }}
-                  />
-                </label>
-              </div>
-            </div>
+            <MediaPickerInput
+              label="Primary Product Image (URL, Upload, or Media Library)"
+              value={editingProduct.image_url || ''}
+              onChange={(url) =>
+                setEditingProduct((prev) => (prev ? { ...prev, image_url: url } : prev))
+              }
+              token={token}
+              media={media}
+              onMediaUploaded={onRefresh}
+              bucket="product-images"
+              previewContain={false}
+            />
 
             <div>
               <label className="block text-xs font-semibold mb-1">Short Summary</label>

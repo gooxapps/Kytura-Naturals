@@ -12,6 +12,7 @@ import {
   LogOut,
   MessageSquareQuote,
   Package,
+  PanelBottom,
   Settings,
   Shield,
   ShoppingBag,
@@ -24,6 +25,7 @@ import { AdminCatalogSection } from './AdminCatalogSection';
 import { AdminOrdersCustomersSection } from './AdminOrdersCustomersSection';
 import { AdminWholesaleSection } from './AdminWholesaleSection';
 import { AdminContentSettingsSection } from './AdminContentSettingsSection';
+import { AdminFooterBrandingSection } from './AdminFooterBrandingSection';
 import type {
   ActivityLog,
   AdminUser,
@@ -48,6 +50,7 @@ type AdminTab =
   | 'orders'
   | 'wholesale'
   | 'customers'
+  | 'branding'
   | 'homepage'
   | 'media'
   | 'pages'
@@ -303,6 +306,7 @@ export const AdminDashboardPage: React.FC = () => {
     { id: 'orders', label: 'Retail Orders', icon: <ShoppingBag className="w-4 h-4" />, roles: ['super_admin', 'store_manager'] },
     { id: 'wholesale', label: 'Wholesale', icon: <Building2 className="w-4 h-4" />, roles: ['super_admin', 'wholesale_manager'] },
     { id: 'customers', label: 'Customers', icon: <Users className="w-4 h-4" />, roles: ['super_admin', 'store_manager'] },
+    { id: 'branding', label: 'Brand, Header & Footer', icon: <PanelBottom className="w-4 h-4" />, roles: ['super_admin', 'store_manager', 'content_manager'] },
     { id: 'homepage', label: 'Homepage Editor', icon: <LayoutTemplate className="w-4 h-4" />, roles: ['super_admin', 'content_manager', 'store_manager'] },
     { id: 'media', label: 'Media Library', icon: <ImageIcon className="w-4 h-4" /> },
     { id: 'pages', label: 'Pages & Content', icon: <FileText className="w-4 h-4" />, roles: ['super_admin', 'content_manager'] },
@@ -440,6 +444,7 @@ export const AdminDashboardPage: React.FC = () => {
               mode={activeTab}
               products={products}
               categories={categories}
+              media={media}
               onRefresh={async () => {
                 await Promise.all([fetchAdminData(), refreshBootstrap()]);
               }}
@@ -464,6 +469,16 @@ export const AdminDashboardPage: React.FC = () => {
               inquiries={wholesaleInquiries}
               products={products}
               onRefresh={fetchAdminData}
+            />
+          )}
+
+          {activeTab === 'branding' && (
+            <AdminFooterBrandingSection
+              token={adminToken}
+              settings={adminSettings}
+              media={media}
+              onRefresh={fetchAdminData}
+              onRefreshStorefront={refreshBootstrap}
             />
           )}
 

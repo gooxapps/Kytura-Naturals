@@ -8,6 +8,8 @@ const ALLOWED_MIME = new Map<string, string>([
   ['image/png', '.png'],
   ['image/webp', '.webp'],
   ['image/avif', '.avif'],
+  ['image/x-icon', '.ico'],
+  ['image/vnd.microsoft.icon', '.ico'],
 ]);
 
 export const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads');
@@ -21,7 +23,7 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 
 export function isValidImageUpload(mimeType: string, sizeBytes: number): { ok: boolean; error?: string } {
   if (!ALLOWED_MIME.has(mimeType)) {
-    return { ok: false, error: 'Only JPG, PNG, WebP, and AVIF image files are allowed.' };
+    return { ok: false, error: 'Only JPG, PNG, WebP, AVIF, and ICO image files are allowed.' };
   }
   if (sizeBytes <= 0 || sizeBytes > 5 * 1024 * 1024) {
     return { ok: false, error: 'Image size must be between 1 byte and 5 MB.' };

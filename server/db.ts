@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
 import { uid, hashPassword, verifyPassword } from './crypto.ts';
+import { DEFAULT_FOOTER_CONFIG, DEFAULT_HEADER_LINKS } from './siteDefaults.ts';
 
 export { uid, hashPassword, verifyPassword };
 export const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads');
@@ -222,6 +223,7 @@ export function initDatabase(): void {
     CREATE TABLE IF NOT EXISTS site_settings (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       business_name TEXT NOT NULL DEFAULT 'Kytura Naturals',
+      brand_tagline TEXT NOT NULL DEFAULT 'BOTANICAL WELLNESS · NATURAL LIVING',
       owner_name TEXT NOT NULL DEFAULT 'Dr Ann Merah',
       email TEXT NOT NULL DEFAULT 'kyturanaturals@gmail.com',
       whatsapp_number TEXT NOT NULL DEFAULT '+14033719687',
@@ -236,6 +238,12 @@ export function initDatabase(): void {
       social_instagram TEXT NOT NULL DEFAULT '',
       social_youtube TEXT NOT NULL DEFAULT '',
       social_pinterest TEXT NOT NULL DEFAULT '',
+      logo_light_url TEXT NOT NULL DEFAULT '',
+      logo_dark_url TEXT NOT NULL DEFAULT '',
+      brand_icon_url TEXT NOT NULL DEFAULT '',
+      favicon_url TEXT NOT NULL DEFAULT '',
+      header_links TEXT NOT NULL DEFAULT '[]',
+      footer_config TEXT NOT NULL DEFAULT '{}',
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -318,6 +326,25 @@ export function initDatabase(): void {
     );
   `);
 
+  // Additive migration for existing SQLite databases
+  const existingCols = new Set(
+    (db.prepare('PRAGMA table_info(site_settings)').all() as Array<{ name: string }>).map((c) => c.name)
+  );
+  const additiveCols: Array<[string, string]> = [
+    ['brand_tagline', "TEXT NOT NULL DEFAULT 'BOTANICAL WELLNESS · NATURAL LIVING'"],
+    ['logo_light_url', "TEXT NOT NULL DEFAULT ''"],
+    ['logo_dark_url', "TEXT NOT NULL DEFAULT ''"],
+    ['brand_icon_url', "TEXT NOT NULL DEFAULT ''"],
+    ['favicon_url', "TEXT NOT NULL DEFAULT ''"],
+    ['header_links', "TEXT NOT NULL DEFAULT '[]'"],
+    ['footer_config', "TEXT NOT NULL DEFAULT '{}'"],
+  ];
+  for (const [col, def] of additiveCols) {
+    if (!existingCols.has(col)) {
+      db.exec(`ALTER TABLE site_settings ADD COLUMN ${col} ${def};`);
+    }
+  }
+
   seedInitialData(db);
 }
 
@@ -326,19 +353,23 @@ function seedInitialData(db: DatabaseSync): void {
   if (!settingsExists) {
     db.prepare(`
       INSERT INTO site_settings (
-        id, business_name, owner_name, email, whatsapp_number, currency, region_label,
+        id, business_name, brand_tagline, owner_name, email, whatsapp_number, currency, region_label,
         announcement_left, announcement_center, free_shipping_threshold_cad,
-        seo_title, seo_description, social_facebook, social_instagram, social_youtube, social_pinterest
-      ) VALUES (1, ?, ?, ?, ?, 'CAD', 'Global / All Regions', ?, ?, 100, ?, ?, '', '', '', '')
+        seo_title, seo_description, social_facebook, social_instagram, social_youtube, social_pinterest,
+        logo_light_url, logo_dark_url, brand_icon_url, favicon_url, header_links, footer_config
+      ) VALUES (1, ?, ?, ?, ?, ?, 'CAD', 'Global / All Regions', ?, ?, 100, ?, ?, '', '', '', '', '', '', '', '', ?, ?)
     `).run(
       'Kytura Naturals',
+      'BOTANICAL WELLNESS · NATURAL LIVING',
       'Dr Ann Merah',
       'kyturanaturals@gmail.com',
       '+14033719687',
       'Discover Natural Wellness with Kytura Naturals',
       'Free Worldwide Shipping on Orders Over $100 CAD',
       'Kytura Naturals | Botanical Wellness, Diffuser Oils & Ultrasonic Diffusers',
-      'Explore botanical diffuser oil blends, body and massage oils, and ultrasonic diffusers from Kytura Naturals.'
+      'Explore botanical diffuser oil blends, body and massage oils, and ultrasonic diffusers from Kytura Naturals.',
+      JSON.stringify(DEFAULT_HEADER_LINKS),
+      JSON.stringify(DEFAULT_FOOTER_CONFIG)
     );
   }
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   ChevronDown,
@@ -18,6 +18,7 @@ import {
   Youtube,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import { BottomNav } from './BottomNav';
 import { BrandLogo } from './BrandLogo';
 import { CartDrawer } from './CartDrawer';
 import { formatPhoneDisplay, formatWhatsappHref, useStore } from '../context/StoreContext';
@@ -71,6 +72,21 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+    setOpenDropdownIndex(null);
+    setAccountDropdownOpen(false);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [mobileMenuOpen]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -378,7 +394,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.2 }}
-              className="xl:hidden border-t border-[#F3F0FF] bg-white overflow-hidden"
+              className="xl:hidden border-t border-[#F3F0FF] bg-white overflow-y-auto max-h-[calc(100dvh-9rem)]"
             >
               <div className="px-4 py-4 space-y-3">
                 <form onSubmit={handleSearch} className="relative">
@@ -445,7 +461,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       <main className="flex-1">{children}</main>
 
       {/* K. Dynamic Admin-Editable Footer matching reference image */}
-      <footer className="bg-gradient-to-b from-[#2A0062] to-[#0E021E] text-white mt-auto">
+      <footer className="bg-gradient-to-b from-[#2A0062] to-[#0E021E] text-white mt-auto pb-20 xl:pb-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-8 items-start">
             {/* Brand Column */}
@@ -646,6 +662,13 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       {/* Slide-out Cart Drawer */}
       <CartDrawer />
 
+      {/* Mobile & Tablet Fixed Bottom Menu Navigation */}
+      <BottomNav
+        mobileMenuOpen={mobileMenuOpen}
+        onToggleMobileMenu={() => setMobileMenuOpen((v) => !v)}
+        onCloseMobileMenu={() => setMobileMenuOpen(false)}
+      />
+
       {/* 6. Floating WhatsApp Button (Bottom-Right) */}
       <a
         href={whatsappInquiryUrl}
@@ -653,7 +676,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         rel="noopener noreferrer"
         aria-label={`Chat with ${settings.business_name} on WhatsApp`}
         className={`fixed right-4 sm:right-6 z-40 group flex items-center gap-2.5 ${
-          isCheckoutPage ? 'bottom-20 sm:bottom-6' : 'bottom-5 sm:bottom-6'
+          isCheckoutPage ? 'bottom-24 xl:bottom-6' : 'bottom-20 xl:bottom-6'
         }`}
       >
         <span className="hidden md:inline-block px-3 py-1.5 rounded-full bg-[#0E021E] text-white text-xs font-medium shadow-lg opacity-0 translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all pointer-events-none">

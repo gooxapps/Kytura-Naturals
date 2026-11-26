@@ -64,7 +64,7 @@ export const AdminDashboardPage: React.FC = () => {
     useStore();
 
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
-  const [authForm, setAuthForm] = useState({ full_name: 'Dr Ann Merah', email: 'kyturanaturals@gmail.com', password: '' });
+  const [authForm, setAuthForm] = useState({ full_name: '', email: '', password: '' });
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
@@ -192,6 +192,7 @@ export const AdminDashboardPage: React.FC = () => {
         setAuthError(data.error || 'Authentication failed.');
       } else {
         setNeedsSetup(false);
+        setAuthForm({ full_name: '', email: '', password: '' });
         setAdminSession(data.token, data.user);
       }
     } catch {
@@ -214,79 +215,93 @@ export const AdminDashboardPage: React.FC = () => {
               <BrandLogo variant="dark" compact />
             </div>
 
-            <div className="flex items-center gap-2 text-[#5000AF] mb-2">
-              <Lock className="w-4 h-4" />
-              <span className="text-xs font-bold uppercase tracking-wider">
-                {needsSetup ? 'Initial Owner Setup' : 'Protected Admin Portal'}
-              </span>
-            </div>
-
-            <h1 className="font-display text-2xl font-bold text-[#0E021E]">
-              {needsSetup ? 'Claim Super Admin Account' : 'Admin Sign In'}
-            </h1>
-            <p className="mt-1.5 text-xs text-[#0E021E]/70 leading-relaxed">
-              {needsSetup
-                ? 'Create the first Super Admin account for Kytura Naturals. Once claimed, public setup locks automatically.'
-                : 'Sign in with an authorized administrator account.'}
-            </p>
-
-            {authError && (
-              <div className="mt-4 p-3 rounded-xl bg-[#B71C85]/10 text-xs font-semibold text-[#B71C85]">
-                {authError}
+            {needsSetup === null ? (
+              <div className="py-10 text-center text-xs text-[#0E021E]/65">
+                Checking portal status...
               </div>
-            )}
-
-            <form onSubmit={handleAuthSubmit} className="mt-5 space-y-4">
-              {needsSetup && (
-                <div>
-                  <label className="block text-xs font-semibold mb-1">Full Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={authForm.full_name}
-                    onChange={(e) => setAuthForm({ ...authForm, full_name: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-[#AA87FF]/45 text-sm"
-                  />
+            ) : (
+              <>
+                <div className="flex items-center gap-2 text-[#5000AF] mb-2">
+                  <Lock className="w-4 h-4" />
+                  <span className="text-xs font-bold uppercase tracking-wider">
+                    {needsSetup ? 'Initial Owner Setup' : 'Protected Admin Portal'}
+                  </span>
                 </div>
-              )}
 
-              <div>
-                <label className="block text-xs font-semibold mb-1">Admin Email</label>
-                <input
-                  type="email"
-                  required
-                  value={authForm.email}
-                  onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#AA87FF]/45 text-sm"
-                />
-              </div>
+                <h1 className="font-display text-2xl font-bold text-[#0E021E]">
+                  {needsSetup ? 'Claim Super Admin Account' : 'Admin Sign In'}
+                </h1>
+                <p className="mt-1.5 text-xs text-[#0E021E]/70 leading-relaxed">
+                  {needsSetup
+                    ? 'Create the first Super Admin account for Kytura Naturals. Once claimed, public setup locks automatically.'
+                    : 'Sign in with your authorized administrator credentials.'}
+                </p>
 
-              <div>
-                <label className="block text-xs font-semibold mb-1">
-                  Password {needsSetup ? '(Min 8 characters)' : ''}
-                </label>
-                <input
-                  type="password"
-                  required
-                  minLength={needsSetup ? 8 : 1}
-                  value={authForm.password}
-                  onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#AA87FF]/45 text-sm"
-                />
-              </div>
+                {authError && (
+                  <div className="mt-4 p-3.5 rounded-xl bg-[#B71C85]/10 text-xs font-semibold text-[#B71C85]">
+                    {authError}
+                  </div>
+                )}
 
-              <button
-                type="submit"
-                disabled={authLoading}
-                className="w-full py-3 rounded-full bg-[#5000AF] text-white text-sm font-semibold hover:bg-[#39008B] disabled:opacity-60"
-              >
-                {authLoading
-                  ? 'Verifying...'
-                  : needsSetup
-                  ? 'Initialize Super Admin'
-                  : 'Sign In to Dashboard'}
-              </button>
-            </form>
+                <form onSubmit={handleAuthSubmit} className="mt-5 space-y-4">
+                  {needsSetup && (
+                    <div>
+                      <label className="block text-xs font-semibold mb-1">Full Name</label>
+                      <input
+                        type="text"
+                        required
+                        autoComplete="name"
+                        placeholder="Enter full name"
+                        value={authForm.full_name}
+                        onChange={(e) => setAuthForm({ ...authForm, full_name: e.target.value })}
+                        className="w-full px-4 py-2.5 rounded-xl border border-[#AA87FF]/45 text-sm"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      required
+                      autoComplete={needsSetup ? 'email' : 'username'}
+                      placeholder="Enter email address"
+                      value={authForm.email}
+                      onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl border border-[#AA87FF]/45 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">
+                      Password {needsSetup ? '(Min 8 characters)' : ''}
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      autoComplete={needsSetup ? 'new-password' : 'current-password'}
+                      placeholder="Enter password"
+                      minLength={needsSetup ? 8 : 1}
+                      value={authForm.password}
+                      onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl border border-[#AA87FF]/45 text-sm"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={authLoading}
+                    className="w-full py-3 rounded-full bg-[#5000AF] text-white text-sm font-semibold hover:bg-[#39008B] disabled:opacity-60"
+                  >
+                    {authLoading
+                      ? 'Verifying...'
+                      : needsSetup
+                      ? 'Initialize Super Admin'
+                      : 'Sign In to Dashboard'}
+                  </button>
+                </form>
+              </>
+            )}
 
             <div className="mt-6 pt-4 border-t border-[#F3F0FF] text-center">
               <Link to="/" className="text-xs font-semibold text-[#5000AF] hover:underline">

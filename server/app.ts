@@ -329,14 +329,18 @@ app.post(
     }
 
     const envPasscode = process.env.ADMIN_PASSCODE?.trim();
-    if (envPasscode && String(password) === envPasscode) {
-      const adminEmail = email ? String(email).trim().toLowerCase() : 'kyturanaturals@gmail.com';
-      const token = signToken({ sub: 'env-super-admin', email: adminEmail, role: 'super_admin', name: 'Administrator' });
-      res.json({
-        token,
-        user: { id: 'env-super-admin', email: adminEmail, full_name: 'Administrator', role: 'super_admin' },
-      });
-      return;
+    if (envPasscode) {
+      const providedDigest = crypto.createHash('sha256').update(String(password)).digest();
+      const expectedDigest = crypto.createHash('sha256').update(envPasscode).digest();
+      if (crypto.timingSafeEqual(providedDigest, expectedDigest)) {
+        const adminEmail = email ? String(email).trim().toLowerCase() : 'admin@local';
+        const token = signToken({ sub: 'env-super-admin', email: adminEmail, role: 'super_admin', name: 'Administrator' });
+        res.json({
+          token,
+          user: { id: 'env-super-admin', email: adminEmail, full_name: 'Administrator', role: 'super_admin' },
+        });
+        return;
+      }
     }
 
     if (!email) {
